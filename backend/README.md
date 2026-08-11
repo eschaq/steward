@@ -8,9 +8,12 @@ Tier 1 Pydantic models, Firestore initialization, and estate membership
 | `models.py`          | Pydantic models for Estate, User, EstateMembership, Item      |
 | `firebase_app.py`    | Initializes the Admin SDK once per process; `get_db()`        |
 | `membership.py`      | Create Auth user, invite to estate, accept invite, role check |
+| `classify.py`        | Photo → the four `ai_*` Item fields, via the Gemini API       |
+| `items.py`           | Writes a classified photo out as an Item document             |
 | `init_firestore.py`  | Seeds one document per collection and reads it back           |
 | `test_membership.py` | Script: invite + accept two users, print each role            |
-| `requirements.txt`   | `firebase-admin`, `pydantic`                                  |
+| `test_classify.py`   | Script: classify a real photo and a blank square, store both  |
+| `requirements.txt`   | `firebase-admin`, `pydantic`, `google-generativeai`, …        |
 
 ## Membership
 
@@ -39,6 +42,63 @@ Behavior worth knowing:
 - Inviting an email with no Auth account raises `MembershipError` rather than
   writing a membership that points at nobody.
 
+## Classification
+
+`classify.py` calls the Gemini API directly (API key from `.env`, see
+`.env.example`), not Vertex AI — GCP billing isn't enabled on this project.
+Model is `gemini-3.5-flash`; override with `GEMINI_MODEL`.
+
+```python
+c = classify_image("test_data/sample_item.png")
+c.ai_category, c.ai_condition_notes, c.ai_est_era_or_brand, c.ai_classification_confidence
+c.status                        # ItemStatus.NEEDS_CLARIFICATION below 0.6, else UNCLAIMED
+
+item, c = classify_and_create_item("seed-estate-001", "photo.png")   # items.py
+```
+
+- **Confidence threshold, 0.6.** `Classification.status` derives the item status
+  from the confidence — a caller cannot pass a status in and override it, so a
+  low-confidence item lands in `needs_clarification` every time.
+- **Failures degrade, they don't block.** A transport error, quota rejection, or
+  unparseable response returns confidence 0.0 with "Couldn't classify this one —
+  take a look?" and an `error` string, which routes through the same threshold to
+  `needs_clarification`. `error` is deliberately *not* persisted — Item's shape
+  is fixed by the data model doc.
+- **`suggested_disposition` is left `uncertain`.** Per the data model it is meant
+  to be weighted by the estate's OverrideLog history, and that loop isn't built
+  yet. A one-shot guess here is the thing the RDD explicitly rejects.
+- Posting the clarifying question to the Message Center is not wired up yet —
+  `Message` has no model, and the item status is the trigger for it.
+- Generation is constrained by a `response_schema`, so the model returns the four
+  fields and nothing else. The parser still uses `raw_decode` rather than
+  `json.loads`: `gemini-3.5-flash` has been observed appending one stray `}`
+  after otherwise valid JSON, and a good classification shouldn't be thrown away
+  over trailing noise.
+
+Verified run — real photo, real API, real Firestore:
+
+```
+sample_item.png              armchair, "Louis XV style", confidence 0.98 -> unclaimed
+generated_blank_square.png   unknown, "solid greyish-blue ... no identifiable
+                             household items", confidence 0.0 -> needs_clarification
+```
+
+### API key
+
+`.env` holds the "Default Gemini API Key" from the `gen-lang-client-0376941757`
+project. The key originally in `.env` belonged to an AI Studio project whose
+prepayment credits were depleted — every model returned 429. Note that AI Studio
+keys are ordinary GCP API keys (`gcloud services api-keys list --project …`), but
+a key minted with `gcloud` against a project AI Studio doesn't know about is
+rejected as `API_KEY_INVALID`; the key has to come from AI Studio.
+
+### `google-generativeai` is deprecated
+
+The SDK prints a deprecation warning on import (support ended; `google-genai` is
+the replacement) and its protobuf pin conflicts with `google-cloud-firestore`'s.
+Firestore works anyway — verified — but this is worth migrating before the
+frontend lands.
+
 ## Running the scripts
 
 ```bash
@@ -51,7 +111,12 @@ gcloud auth application-default set-quota-project steward-hackathon-505217
 
 .venv/bin/python init_firestore.py
 .venv/bin/python test_membership.py
+.venv/bin/python test_classify.py
 ```
+
+`test_classify.py` exit codes: `0` both cases behaved, `1` a real logic failure,
+`2` the Gemini API refused both calls so classification quality could not be
+judged (billing/quota, not code).
 
 Both are idempotent — fixed ids and fixed test emails, so re-running overwrites
 rather than duplicating.

@@ -1,2 +1,6 @@
 firebase-admin==6.5.0
 pydantic==2.8.2
+google-generativeai==0.8.6
+python-dotenv==1.2.2
+# Only used by test_classify.py, to generate the unrecognizable test image.
+pillow==12.3.0
