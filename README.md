@@ -53,3 +53,7 @@ git clone <repo-url> && cd steward
 ## Status
 
 Scaffolding only. No application code, dependencies, or business logic yet.
+
+## License
+
+[MIT](LICENSE)
