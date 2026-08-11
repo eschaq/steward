@@ -1,0 +1,82 @@
+# ---------- Secrets & credentials (keep at top; never commit these) ----------
+# Firebase / GCP service accounts
+serviceAccountKey.json
+*-firebase-adminsdk-*.json
+*credentials*.json
+*service-account*.json
+*serviceaccount*.json
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+firestore-debug.log
+ui-debug.log
+.firebaserc.local
+gha-creds-*.json
+application_default_credentials.json
+
+# Environment files
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# ---------- Node ----------
+node_modules/
+dist/
+build/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm/
+.pnpm-store/
+.cache/
+
+# ---------- Python ----------
+venv/
+.venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.tox/
+htmlcov/
+.coverage
+.coverage.*
+.python-version
+
+# ---------- OS / editor junk ----------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+.idea/
+
+# VS Code: ignore local settings, keep the shared bits
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+
+# ---------- Local scratch ----------
+*.local
+tmp/
+.tmp/
+logs/
+*.log
