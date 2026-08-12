@@ -1,19 +1,21 @@
 # Steward — backend
 
-Tier 1 Pydantic models, Firestore initialization, and estate membership
-(Auth users, invites, role checks). No HTTP API or agent logic yet.
+Tier 1 Pydantic models, Firestore initialization, estate membership
+(Auth users, invites, role checks), and claims. No HTTP API or agent logic yet.
 
-| File                 | Purpose                                                      |
-| -------------------- | ------------------------------------------------------------ |
-| `models.py`          | Pydantic models for Estate, User, EstateMembership, Item      |
-| `firebase_app.py`    | Initializes the Admin SDK once per process; `get_db()`        |
-| `membership.py`      | Create Auth user, invite to estate, accept invite, role check |
-| `classify.py`        | Photo → the four `ai_*` Item fields, via the Gemini API       |
-| `items.py`           | Writes a classified photo out as an Item document             |
-| `init_firestore.py`  | Seeds one document per collection and reads it back           |
-| `test_membership.py` | Script: invite + accept two users, print each role            |
-| `test_classify.py`   | Script: classify a real photo and a blank square, store both  |
-| `requirements.txt`   | `firebase-admin`, `pydantic`, `google-generativeai`, …        |
+| File                 | Purpose                                                       |
+| -------------------- | ------------------------------------------------------------- |
+| `models.py`          | Pydantic models for Estate, User, EstateMembership, Claim, Item |
+| `firebase_app.py`    | Initializes the Admin SDK once per process; `get_db()`         |
+| `membership.py`      | Create Auth user, invite to estate, accept invite, role check  |
+| `classify.py`        | Photo → the four `ai_*` Item fields, via the Gemini API        |
+| `items.py`           | Writes a classified photo out as an Item document              |
+| `claims.py`          | Record a claim; re-derive item status from its claims          |
+| `init_firestore.py`  | Seeds one document per collection and reads it back            |
+| `test_membership.py` | Script: invite + accept two users, print each role             |
+| `test_classify.py`   | Script: classify a real photo and a blank square, store both   |
+| `test_claims.py`     | Script: claim one item alone, another twice, check statuses    |
+| `requirements.txt`   | `firebase-admin`, `pydantic`, `google-generativeai`, …         |
 
 ## Membership
 
@@ -41,6 +43,50 @@ Behavior worth knowing:
   acceptance, and accepting twice keeps the first `accepted_at`.
 - Inviting an email with no Auth account raises `MembershipError` rather than
   writing a membership that points at nobody.
+
+## Claims
+
+`claims.py` records claims and derives item status from them. Callers never pass
+a status in — `record_claim` writes the claim, then recomputes.
+
+```python
+claim, status = record_claim("item-123", uid, comment="Grandma promised me these.")
+status                                  # ItemStatus.CLAIMED  (or CONTESTED)
+
+get_claims_for_item("item-123")         # [Claim, …], oldest first
+count_claims("item-123")                # 2  — documents, duplicates included
+count_distinct_claimants("item-123")    # 1  — people
+recompute_item_status("item-123")       # re-derive without adding a claim
+```
+
+Behavior worth knowing:
+
+- **No uniqueness constraint, on purpose.** Two beneficiaries claiming at the
+  same moment both get a document. 2+ claimants already *means* `contested`, so
+  there is nothing to race-prevent — per the RDD's failure-handling section.
+- **Status counts distinct claimants, not documents.** 0 → `unclaimed`,
+  1 → `claimed`, 2+ → `contested`.
+- **A repeat claim from the same user is recorded, not deduplicated.** It is a
+  real event (usually a revised comment) and dropping it would be a silent guess
+  about what the person meant. Since counting is per-person, re-claiming never
+  escalates an item to `contested` by itself.
+- **`resolved`, `routed`, and `needs_clarification` are left alone.** Recompute
+  owns only the `unclaimed`/`claimed`/`contested` triad; it returns the current
+  status unchanged rather than dragging a resolved item backwards.
+- Claiming a nonexistent item raises `ClaimError` instead of writing an orphan
+  claim.
+- Querying claims by `item_id` is a single-field equality filter, so Firestore's
+  automatic index covers it — no composite index to deploy.
+- Posting the mediation message when an item flips to `contested` is not wired up
+  yet — `Message` has no model. The status transition is the trigger for it.
+
+Verified run against real Firestore (`test_claims.py`), both transitions:
+
+```
+test-claim-item-a   1 claimant  -> claimed     1 claim  queried back
+test-claim-item-b   2 claimants -> contested   2 claims queried back
+test-claim-item-a   same claimant again -> still claimed, 2 claims / 1 claimant
+```
 
 ## Classification
 
@@ -112,6 +158,7 @@ gcloud auth application-default set-quota-project steward-hackathon-505217
 .venv/bin/python init_firestore.py
 .venv/bin/python test_membership.py
 .venv/bin/python test_classify.py
+.venv/bin/python test_claims.py
 ```
 
 `test_classify.py` exit codes: `0` both cases behaved, `1` a real logic failure,
@@ -168,4 +215,4 @@ Without the first call, every Admin SDK Auth call fails with
 
 - Project: `steward-hackathon-505217`
 - Database: `(default)`, Native mode, location `nam5` (US multi-region), free tier
-- Collections: `estates`, `users`, `estate_memberships`, `items`
+- Collections: `estates`, `users`, `estate_memberships`, `items`, `claims`

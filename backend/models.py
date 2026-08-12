@@ -79,6 +79,16 @@ class EstateMembership(BaseModel):
     accepted_at: Optional[datetime] = None
 
 
+class Claim(BaseModel):
+    COLLECTION: ClassVar[str] = "claims"
+
+    id: str
+    item_id: str
+    user_id: str
+    claimed_at: datetime = Field(default_factory=_utcnow)
+    comment: Optional[str] = None
+
+
 class Item(BaseModel):
     COLLECTION: ClassVar[str] = "items"
 
