@@ -11,6 +11,7 @@ from classify import Classification, classify_image
 from firebase_app import get_db
 from messages import post_clarifying_question
 from models import Item, ItemStatus, SuggestedDisposition
+from overrides import DispositionSuggestion, suggest_disposition
 
 
 def _to_firestore(item: Item) -> dict:
@@ -18,6 +19,24 @@ def _to_firestore(item: Item) -> dict:
         key: value.value if isinstance(value, Enum) else value
         for key, value in item.model_dump().items()
     }
+
+
+def suggestion_for(
+    estate_id: str, classification: Classification
+) -> DispositionSuggestion:
+    """The disposition the agent would suggest for this classification, and why.
+
+    Exposed separately because `Item` has no field for the reason — its shape is
+    fixed by the data model doc — so a caller that wants to show the family *why*
+    ("this estate has donated 3 of 4 kitchenware items") asks for it here.
+    """
+    return suggest_disposition(
+        estate_id=estate_id,
+        item_category=classification.ai_category,
+        baseline=SuggestedDisposition.UNCERTAIN,
+        ai_classification_confidence=classification.ai_classification_confidence,
+        identified=not classification.needs_clarification,
+    )
 
 
 def create_item_from_classification(
@@ -31,9 +50,10 @@ def create_item_from_classification(
     Status comes from the confidence threshold, not from the caller — a
     low-confidence item lands in `needs_clarification` every time.
 
-    suggested_disposition stays `uncertain` for now: per the data model it is
-    meant to be weighted by this estate's OverrideLog history, and that loop
-    isn't built yet. A one-shot guess here is explicitly what the RDD rejects.
+    suggested_disposition is weighted by this estate's OverrideLog history for
+    the item's category. With no history it stays `uncertain` — the classifier
+    reads what a thing *is*, not what should happen to it, and a one-shot guess
+    at the latter is what the RDD rejects.
 
     An item that lands in `needs_clarification` gets the agent's clarifying
     question posted to the Message Center — the status alone is a dead end for
@@ -44,6 +64,8 @@ def create_item_from_classification(
         db.collection(Item.COLLECTION).document()
     )
 
+    suggestion = suggestion_for(estate_id, classification)
+
     item = Item(
         id=doc_ref.id,
         estate_id=estate_id,
@@ -52,7 +74,7 @@ def create_item_from_classification(
         ai_condition_notes=classification.ai_condition_notes,
         ai_est_era_or_brand=classification.ai_est_era_or_brand,
         ai_classification_confidence=classification.ai_classification_confidence,
-        suggested_disposition=SuggestedDisposition.UNCERTAIN,
+        suggested_disposition=suggestion.suggested_disposition,
         status=classification.status,
     )
     doc_ref.set(_to_firestore(item))

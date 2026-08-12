@@ -14,12 +14,15 @@ behaviors. No HTTP API yet.
 | `claims.py`          | Record a claim; re-derive item status from its claims           |
 | `messages.py`        | The feed, the agent User, and the agent's two behaviors         |
 | `resolutions.py`     | Executor resolves a claimed/contested item; flips to `resolved` |
+| `overrides.py`       | OverrideLog + the adaptive suggestion loop                       |
+| `dispositions.py`    | **Placeholder** for Disposition — logs the executor's decision   |
 | `init_firestore.py`  | Seeds one document per collection and reads it back             |
 | `test_membership.py` | Script: invite + accept two users, print each role              |
 | `test_classify.py`   | Script: classify a real photo and a blank square, store both    |
 | `test_claims.py`     | Script: claim one item alone, another twice, check statuses     |
 | `test_messages.py`   | Script: both agent behaviors fire once, and only once           |
 | `test_resolutions.py`| Script: beneficiary refused, executor resolves, unclaimed refused |
+| `test_overrides.py`  | Script: same photo, cold start vs. after the estate has a habit  |
 | `requirements.txt`   | `firebase-admin`, `pydantic`, `google-generativeai`, …          |
 
 ## Membership
@@ -48,6 +51,100 @@ Behavior worth knowing:
   acceptance, and accepting twice keeps the first `accepted_at`.
 - Inviting an email with no Auth account raises `MembershipError` rather than
   writing a membership that points at nobody.
+
+## Adaptive suggestions (OverrideLog)
+
+This is the persistent-memory mechanic the Collaborative Partner track requires.
+Every finalized executor decision lands in `override_logs`; before suggesting a
+disposition for a new item, the agent counts this estate's past decisions in the
+same category and leans that way, saying plainly why.
+
+```python
+record_disposition_decision(item_id, SuggestedDisposition.DONATE, executor_uid)
+
+suggest_disposition(estate_id, "armchair")
+#   .suggested_disposition  SuggestedDisposition.DONATE
+#   .reason   "This estate has donated 3 of 4 armchair items so far, so I'm
+#              leaning donate here too."
+#   .has_pattern / .matching_count / .history_count
+```
+
+**Simple category-based counting, deliberately** — one query and a `Counter`.
+No embeddings, no vector search, no semantic retrieval; an explicit non-goal per
+CLAUDE.md. `item_category` is denormalized onto the log row so this stays a
+count, not a join.
+
+### Where it hooks in
+
+`items.create_item_from_classification` consults it before writing the Item, so
+`suggested_disposition` is adapted at creation time rather than patched later.
+The classifier reads what a thing *is*; the override history is the only thing
+that says what should happen to it.
+
+`Item` has no field for the reason — its shape is fixed by the data model doc —
+so `items.suggestion_for(estate_id, classification)` returns the full
+`DispositionSuggestion` for a caller that wants to show the family *why*.
+Surfacing that in the UI or the feed is not wired up yet.
+
+### What it does when it doesn't know
+
+- **No history for the category** → the classifier's read is returned unchanged
+  (`uncertain`), `has_pattern=False`, and the reason contains the literal phrase
+  **"no pattern yet for this estate"**. It never fabricates a lean from nothing.
+- **A dead heat** (2 donated, 2 sold) → also not a pattern. The reason names the
+  split rather than picking a side and dressing it up as a preference.
+- **An unidentified item** (`needs_clarification`) → the lookup is skipped
+  entirely. A real pattern must not be applied to a guess about what the item is.
+- `ai_classification_confidence` is passed through untouched in every branch —
+  the override log weights the *disposition*, never the classifier's confidence
+  in what the thing is.
+
+`MIN_HISTORY_FOR_PATTERN = 1`, so a single past decision counts. The reason text
+carries the thinness honestly ("has donated the one armchair item so far")
+instead of a hidden threshold silently ignoring it. Raise the constant if one
+data point turns out to feel jumpy in the demo.
+
+### `dispositions.py` is a placeholder
+
+**It is not the Disposition entity.** The data model defines Disposition as a
+real Tier 1 row (id, item_id, channel, status, completed_at) and calls it *the
+seam* — the point every resolved item passes through, and the only thing Tier 2
+and Tier 3 attach to. None of that is built.
+
+`record_disposition_decision(item_id, choice, uid)` exists because the adaptive
+loop needs something to learn from. When the real entity lands, this function
+writes the Disposition row *and* logs the override — the OverrideLog write moves
+inside it rather than being replaced by it.
+
+Its gates match `resolutions.py`: executor only (`MembershipError`), and only on
+an item that is actually `resolved` (`DispositionError`). `uncertain` is rejected
+as a choice — it is the absence of a decision, and logging it would teach the
+estate's history that hesitation is a preference. One logged decision per item,
+via a deterministic id (`override__{item_id}`), so an executor who changes their
+mind replaces their earlier decision instead of having both counted.
+
+Verified run against real Firestore (`test_overrides.py`) — one real Gemini
+classification of `sample_item.png`, put through the same path twice:
+
+```
+category 'armchair', confidence 0.98
+
+(a) no history      -> uncertain
+    "There's no pattern yet for this estate — nothing else in armchair has
+     been decided yet, so this is the classifier's read on its own."
+
+    ... 4 items claimed, resolved, and decided: donate, donate, sell, donate
+
+(b) same photo      -> donate
+    "This estate has donated 3 of 4 armchair items so far, so I'm leaning
+     donate here too."
+
+(c) same category, confidence 0.0 -> uncertain, pattern deliberately not applied
+```
+
+The four history items are built the long way round — claimed, resolved, then
+decided — rather than by writing log rows directly, so the history under test is
+history the real flow could actually have produced.
 
 ## Resolutions
 
@@ -240,9 +337,9 @@ item, c = classify_and_create_item("seed-estate-001", "photo.png")   # items.py
   take a look?" and an `error` string, which routes through the same threshold to
   `needs_clarification`. `error` is deliberately *not* persisted — Item's shape
   is fixed by the data model doc.
-- **`suggested_disposition` is left `uncertain`.** Per the data model it is meant
-  to be weighted by the estate's OverrideLog history, and that loop isn't built
-  yet. A one-shot guess here is the thing the RDD explicitly rejects.
+- **`suggested_disposition` comes from the estate's OverrideLog history**, not
+  from Gemini — see Adaptive suggestions above. With no history it stays
+  `uncertain`; a one-shot guess is the thing the RDD explicitly rejects.
 - Posting the clarifying question to the Message Center is not wired up yet —
   `Message` has no model, and the item status is the trigger for it.
 - Generation is constrained by a `response_schema`, so the model returns the four
@@ -291,6 +388,7 @@ gcloud auth application-default set-quota-project steward-hackathon-505217
 .venv/bin/python test_claims.py
 .venv/bin/python test_messages.py
 .venv/bin/python test_resolutions.py
+.venv/bin/python test_overrides.py
 ```
 
 `test_classify.py` exit codes: `0` both cases behaved, `1` a real logic failure,
@@ -348,4 +446,4 @@ Without the first call, every Admin SDK Auth call fails with
 - Project: `steward-hackathon-505217`
 - Database: `(default)`, Native mode, location `nam5` (US multi-region), free tier
 - Collections: `estates`, `users`, `estate_memberships`, `items`, `claims`,
-  `messages`, `resolutions`
+  `messages`, `resolutions`, `override_logs`

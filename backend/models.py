@@ -79,6 +79,28 @@ class EstateMembership(BaseModel):
     accepted_at: Optional[datetime] = None
 
 
+class OverrideLog(BaseModel):
+    """One executor disposition decision, kept so the agent can learn from it.
+
+    The adaptation mechanic the Collaborative Partner track requires. Every
+    finalized decision is logged, not only the ones that contradicted the AI —
+    the suggestion is weighted by total category outcomes ("donated 4 of 5"),
+    which needs the agreements counted too.
+    """
+
+    COLLECTION: ClassVar[str] = "override_logs"
+
+    id: str
+    estate_id: str
+    item_id: str
+    # Denormalized copy of Item.ai_category — avoids a join when weighting
+    # future suggestions.
+    item_category: str
+    ai_suggested_disposition: SuggestedDisposition
+    executor_chosen_disposition: SuggestedDisposition
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
 class ResolutionType(str, Enum):
     ASSIGNED_TO_CLAIMANT = "assigned_to_claimant"
     ROTATION = "rotation"
