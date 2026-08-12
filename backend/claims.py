@@ -64,6 +64,15 @@ def count_claims(item_id: str) -> int:
     return len(get_claims_for_item(item_id))
 
 
+def claimant_ids_for_item(item_id: str) -> list[str]:
+    """The distinct users who claimed `item_id`, in the order they spoke up.
+
+    Order matters: the mediation message names people in it. Shared with the ADK
+    tool wrapper so both derive claimants the same way.
+    """
+    return list(dict.fromkeys(claim.user_id for claim in get_claims_for_item(item_id)))
+
+
 def count_distinct_claimants(item_id: str) -> int:
     """How many *different* users have claimed `item_id`.
 
@@ -103,10 +112,9 @@ def recompute_item_status(item_id: str) -> ItemStatus:
     if current not in CLAIMABLE_STATUSES:
         return current
 
-    claims = get_claims_for_item(item_id)
     # Claimant order follows claimed_at, so the mediation message names people
     # in the order they actually spoke up.
-    claimant_ids = list(dict.fromkeys(claim.user_id for claim in claims))
+    claimant_ids = claimant_ids_for_item(item_id)
 
     new_status = status_for_claimant_count(len(claimant_ids))
     if new_status == current:

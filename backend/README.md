@@ -1,8 +1,9 @@
 # Steward — backend
 
 Tier 1 Pydantic models, Firestore initialization, estate membership (Auth users,
-invites, role checks), claims, and the Message Center with its two agent
-behaviors. No HTTP API yet.
+invites, role checks), claims, resolutions, dispositions, the adaptive suggestion
+loop, and the Message Center with its two agent behaviors — the last wrapped as
+Google ADK tools behind a minimal FastAPI app.
 
 | File                 | Purpose                                                        |
 | -------------------- | -------------------------------------------------------------- |
@@ -13,6 +14,8 @@ behaviors. No HTTP API yet.
 | `items.py`           | Writes a classified photo out as an Item document               |
 | `claims.py`          | Record a claim; re-derive item status from its claims           |
 | `messages.py`        | The feed, the agent User, and the agent's two behaviors         |
+| `agent.py`           | ADK tools wrapping the two agent behaviors; the `LlmAgent`       |
+| `api.py`             | FastAPI app — one route, what Cloud Run will serve               |
 | `resolutions.py`     | Executor resolves a claimed/contested item; flips to `resolved` |
 | `overrides.py`       | OverrideLog + the adaptive suggestion loop                       |
 | `dispositions.py`    | Executor's final call: writes the Disposition row + OverrideLog  |
@@ -25,6 +28,7 @@ behaviors. No HTTP API yet.
 | `test_overrides.py`  | Script: same photo, cold start vs. after the estate has a habit  |
 | `test_dispositions.py`| Script: a decision writes both docs; uncertain/unresolved refused |
 | `test_recompute.py`  | Script: a stale suggestion catches up; a resolved one is left alone |
+| `test_api.py`        | Script: both behaviors over HTTP via ADK, byte-identical copy    |
 | `requirements.txt`   | `firebase-admin`, `pydantic`, `google-generativeai`, …          |
 
 ## Membership
@@ -53,6 +57,92 @@ Behavior worth knowing:
   acceptance, and accepting twice keeps the first `accepted_at`.
 - Inviting an email with no Auth account raises `MembershipError` rather than
   writing a membership that points at nobody.
+
+## Agent layer (ADK) and the API
+
+`agent.py` wraps the two agent behaviors as ADK `FunctionTool`s and holds them on
+a real `LlmAgent`. This is a **structural wrap, not a rewrite** — the copy the
+family reads and the Message writing both stay in `messages.py`, and the
+no-double-post guarantee still lives in `messages._post_once`. The tools look up
+what each behavior needs from Firestore and hand off.
+
+```python
+steward_agent            # LlmAgent, model gemini-3.5-flash, holding both tools
+await run_behavior_for_item(item_id)
+#  {"behavior": "mediate_contested_item", "item_status": "contested",
+#   "status": "posted", "item_id": …, "message_id": "agent-mediate__…"}
+```
+
+| Item status           | Tool                     |
+| --------------------- | ------------------------ |
+| `needs_clarification` | `ask_about_unclear_item` |
+| `contested`           | `mediate_contested_item` |
+
+### Why the tools are invoked directly, not through a model turn
+
+Both behaviors fire on a **state transition the backend already detects** — an
+item landing in `needs_clarification`, or flipping to `contested`. There is no
+decision for a model to make about which one applies, and letting one choose
+would put the family's message content at the mercy of a sampling temperature.
+
+So `run_behavior_for_item` dispatches on status and invokes the tool through
+ADK's own `run_async` contract — argument validation, tool declarations, and
+result shape all go through the framework, and a `{"error": …}` return is raised
+rather than read as success. `steward_agent` is a real `LlmAgent` holding these
+tools, ready for the model-driven paths (a "what should we do with the garage?"
+conversation) that come later.
+
+### Classification is not wrapped as a tool
+
+Three reasons, in order of weight:
+
+1. **It isn't an action an agent decides to take.** Classification produces the
+   input the agent reasons *about*. Fronting it as a tool means an LLM turn whose
+   only job is to decide to make another LLM call.
+2. **It would disrupt a verified path.** `classify.py` pins generation to a
+   `response_schema` and parses with `raw_decode` to tolerate a known
+   `gemini-3.5-flash` quirk (an occasional stray `}`). Routing it through an
+   `LlmAgent` replaces that with ADK's own response handling and loses the
+   tolerance.
+3. **The right change is a migration, not a wrap.** `google-adk` brings in
+   `google-genai`, the SDK that replaces the deprecated `google-generativeai`
+   this module still uses. Moving `classify.py` onto `google-genai` is now
+   unblocked and is the natural next step — but that's a rewrite of verified
+   code, so it wants its own loop.
+
+### The API
+
+```
+GET  /healthz
+POST /items/{item_id}/agent-message
+```
+
+One route, deliberately. No auth middleware and no other routes — both are later
+work, and the frontend service will reach Firestore only through here (CLAUDE.md's
+trust boundary). 404 if the item doesn't exist, **409** if it is in a state no
+behavior attaches to; a 200 that quietly did nothing would be the failure mode
+the RDD rules out. Calling twice is safe — the second call reports
+`already_asked` / `already_mediated`.
+
+```bash
+.venv/bin/uvicorn api:app --reload      # local
+```
+
+Verified run against real Firestore (`test_api.py`, driven with FastAPI's
+`TestClient` — no live server):
+
+```
+(a) needs_clarification -> POST writes the clarifying question
+    text == messages.clarifying_question_text(same inputs)   [exact match]
+    second POST -> already_asked, still 1 message, created_at untouched
+(b) contested -> POST writes the mediating suggestion
+    text == messages.mediation_text(same claimants, same order)  [exact match]
+    second POST -> already_mediated, still 1 message, created_at untouched
+(c) unclaimed item -> 409, nothing written;  unknown item -> 404
+```
+
+The equality assertions compare against `messages.py`'s own copy functions, so
+"the ADK path writes what the direct path wrote" is checked rather than assumed.
 
 ## Dispositions
 
@@ -479,6 +569,11 @@ the replacement) and its protobuf pin conflicts with `google-cloud-firestore`'s.
 Firestore works anyway — verified — but this is worth migrating before the
 frontend lands.
 
+`google-adk` now installs `google-genai` alongside it, so the replacement is
+already present and the migration is unblocked. The two coexist without issue —
+a live classification call succeeded on the current stack. See "Classification is
+not wrapped as a tool" above for why the migration is its own piece of work.
+
 ## Running the scripts
 
 ```bash
@@ -498,7 +593,19 @@ gcloud auth application-default set-quota-project steward-hackathon-505217
 .venv/bin/python test_overrides.py
 .venv/bin/python test_dispositions.py
 .venv/bin/python test_recompute.py
+.venv/bin/python test_api.py
 ```
+
+### Gemini free-tier daily cap
+
+`gemini-3.5-flash` on this project is capped at **20 `generateContent` requests
+per day** (`GenerateRequestsPerDayPerProjectPerModel-FreeTier`). `test_classify`,
+`test_overrides`, and `test_recompute` each spend one or two, so running the full
+set several times in a day exhausts it and those three start returning 429.
+
+They fail honestly when that happens — `test_overrides` and `test_recompute` exit
+`2` (BLOCKED, quota not logic) and say so. The other six suites, including
+`test_api`, use no Gemini quota at all and can be run freely.
 
 `test_classify.py` exit codes: `0` both cases behaved, `1` a real logic failure,
 `2` the Gemini API refused both calls so classification quality could not be

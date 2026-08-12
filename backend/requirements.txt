@@ -1,6 +1,14 @@
 firebase-admin==6.5.0
-pydantic==2.8.2
+# google-adk 2.6.3 requires pydantic>=2.12, which moved this off the old 2.8.2
+# pin. All nine entity suites were re-run on 2.13.4 — see README.
+pydantic==2.13.4
+google-adk==2.6.3
+fastapi==0.141.1
+# Serves the FastAPI app on Cloud Run.
+uvicorn==0.52.1
 google-generativeai==0.8.6
 python-dotenv==1.2.2
 # Only used by test_classify.py, to generate the unrecognizable test image.
 pillow==12.3.0
+# Required by fastapi.testclient, which test_api.py drives the API with.
+httpx==0.28.1
