@@ -15,7 +15,7 @@ behaviors. No HTTP API yet.
 | `messages.py`        | The feed, the agent User, and the agent's two behaviors         |
 | `resolutions.py`     | Executor resolves a claimed/contested item; flips to `resolved` |
 | `overrides.py`       | OverrideLog + the adaptive suggestion loop                       |
-| `dispositions.py`    | **Placeholder** for Disposition — logs the executor's decision   |
+| `dispositions.py`    | Executor's final call: writes the Disposition row + OverrideLog  |
 | `init_firestore.py`  | Seeds one document per collection and reads it back             |
 | `test_membership.py` | Script: invite + accept two users, print each role              |
 | `test_classify.py`   | Script: classify a real photo and a blank square, store both    |
@@ -23,6 +23,7 @@ behaviors. No HTTP API yet.
 | `test_messages.py`   | Script: both agent behaviors fire once, and only once           |
 | `test_resolutions.py`| Script: beneficiary refused, executor resolves, unclaimed refused |
 | `test_overrides.py`  | Script: same photo, cold start vs. after the estate has a habit  |
+| `test_dispositions.py`| Script: a decision writes both docs; uncertain/unresolved refused |
 | `requirements.txt`   | `firebase-admin`, `pydantic`, `google-generativeai`, …          |
 
 ## Membership
@@ -51,6 +52,78 @@ Behavior worth knowing:
   acceptance, and accepting twice keeps the first `accepted_at`.
 - Inviting an email with no Auth account raises `MembershipError` rather than
   writing a membership that points at nobody.
+
+## Dispositions
+
+Disposition is **the seam** the data model doc describes: the point every item
+passes through once resolved, and the only thing Tier 2 (MarketplaceListing) and
+Tier 3 (AuctionBatchItem) ever attach to. Nothing later touches Item, Claim, or
+Resolution.
+
+```python
+entry, disposition = record_disposition_decision(
+    item_id, SuggestedDisposition.DONATE, executor_uid
+)
+disposition.channel   # DispositionChannel.DONATE
+disposition.status    # DispositionStatus.PENDING
+
+get_disposition(item_id)           # Disposition | None
+get_disposition_decision(item_id)  # OverrideLog | None
+```
+
+One call writes **two documents in a single batch** — the Disposition row and the
+OverrideLog entry. A decision that logged but didn't route, or routed but didn't
+log, would leave the estate's learned history and the item's actual fate
+disagreeing, so they land together or not at all.
+
+### The channel map
+
+| Executor chooses | Channel            |
+| ---------------- | ------------------ |
+| `discard`        | `discard`          |
+| `donate`         | `donate`           |
+| `sell`           | `sell_marketplace` |
+| `uncertain`      | *rejected*         |
+
+`sell_auction_bulk` is on the enum so the entity's shape never changes when Tier
+3 lands, but **nothing in Tier 1 routes to it** — the test asserts it is absent
+from `CHANNEL_FOR_CHOICE.values()`, so a path can't appear unnoticed.
+
+### Gates
+
+- **Executor only** — `require_role(...)`, raising `MembershipError`. Checked
+  first, so a non-executor isn't told about the item's state.
+- **Resolved only** — `DispositionError` otherwise. A disposition decided before
+  the family has settled who gets the item answers the wrong question.
+- **`uncertain` is refused** — it is the absence of a decision, there is no
+  channel for it, and logging it would teach the estate's history that hesitation
+  is a preference. Deferring is a legitimate thing for an executor to do; it just
+  isn't this function, so it raises rather than defaulting to something.
+
+Both refusals happen before any write. The test checks *both* collections are
+untouched, not just that an error was raised.
+
+### Other behavior
+
+- **One decision per item**, via deterministic ids (`disposition__{item_id}` and
+  `override__{item_id}`). An executor who revises their call replaces both
+  documents, so the two never drift apart and the history isn't double-counted.
+- **The item stays `resolved`.** Deciding a disposition routes the item; it does
+  not advance or re-open it. `ItemStatus.ROUTED` exists but nothing sets it yet —
+  that belongs with acting on a disposition (`pending` → `in_progress` →
+  `completed`), which isn't built.
+- `status` starts `pending` and `completed_at` starts null. Nothing advances them
+  yet.
+
+Verified run against real Firestore (`test_dispositions.py`):
+
+```
+(a) donate on a resolved item -> both documents written and mutually consistent
+    (channel == CHANNEL_FOR_CHOICE[logged choice]; item still resolved)
+(b) uncertain                 -> DispositionError, neither collection touched
+(c) unresolved item           -> DispositionError, neither collection touched
+(d) sell -> sell_marketplace, discard -> discard, no path to sell_auction_bulk
+```
 
 ## Adaptive suggestions (OverrideLog)
 
@@ -104,24 +177,11 @@ carries the thinness honestly ("has donated the one armchair item so far")
 instead of a hidden threshold silently ignoring it. Raise the constant if one
 data point turns out to feel jumpy in the demo.
 
-### `dispositions.py` is a placeholder
+### Where the decision comes from
 
-**It is not the Disposition entity.** The data model defines Disposition as a
-real Tier 1 row (id, item_id, channel, status, completed_at) and calls it *the
-seam* — the point every resolved item passes through, and the only thing Tier 2
-and Tier 3 attach to. None of that is built.
-
-`record_disposition_decision(item_id, choice, uid)` exists because the adaptive
-loop needs something to learn from. When the real entity lands, this function
-writes the Disposition row *and* logs the override — the OverrideLog write moves
-inside it rather than being replaced by it.
-
-Its gates match `resolutions.py`: executor only (`MembershipError`), and only on
-an item that is actually `resolved` (`DispositionError`). `uncertain` is rejected
-as a choice — it is the absence of a decision, and logging it would teach the
-estate's history that hesitation is a preference. One logged decision per item,
-via a deterministic id (`override__{item_id}`), so an executor who changes their
-mind replaces their earlier decision instead of having both counted.
+`dispositions.record_disposition_decision` is what feeds this — see Dispositions
+below. Every finalized decision is logged, agreements included, because the tally
+counts total outcomes rather than corrections.
 
 Verified run against real Firestore (`test_overrides.py`) — one real Gemini
 classification of `sample_item.png`, put through the same path twice:
@@ -389,6 +449,7 @@ gcloud auth application-default set-quota-project steward-hackathon-505217
 .venv/bin/python test_messages.py
 .venv/bin/python test_resolutions.py
 .venv/bin/python test_overrides.py
+.venv/bin/python test_dispositions.py
 ```
 
 `test_classify.py` exit codes: `0` both cases behaved, `1` a real logic failure,
@@ -446,4 +507,4 @@ Without the first call, every Admin SDK Auth call fails with
 - Project: `steward-hackathon-505217`
 - Database: `(default)`, Native mode, location `nam5` (US multi-region), free tier
 - Collections: `estates`, `users`, `estate_memberships`, `items`, `claims`,
-  `messages`, `resolutions`, `override_logs`
+  `messages`, `resolutions`, `override_logs`, `dispositions`

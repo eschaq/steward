@@ -79,6 +79,39 @@ class EstateMembership(BaseModel):
     accepted_at: Optional[datetime] = None
 
 
+class DispositionChannel(str, Enum):
+    DISCARD = "discard"
+    DONATE = "donate"
+    SELL_MARKETPLACE = "sell_marketplace"
+    # Tier 3. Part of the entity's shape from the start so Tier 1 never changes
+    # when auction batching lands — nothing in Tier 1 routes to it.
+    SELL_AUCTION_BULK = "sell_auction_bulk"
+
+
+class DispositionStatus(str, Enum):
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+
+
+class Disposition(BaseModel):
+    """Where an item ends up — and the seam every later tier attaches to.
+
+    Tier 2 (MarketplaceListing) and Tier 3 (AuctionBatchItem) reference a
+    Disposition row and never touch Item, Claim, or Resolution. Keep it that way.
+
+    Fields are exactly the data model doc's five; it defines no created_at.
+    """
+
+    COLLECTION: ClassVar[str] = "dispositions"
+
+    id: str
+    item_id: str
+    channel: DispositionChannel
+    status: DispositionStatus = DispositionStatus.PENDING
+    completed_at: Optional[datetime] = None
+
+
 class OverrideLog(BaseModel):
     """One executor disposition decision, kept so the agent can learn from it.
 

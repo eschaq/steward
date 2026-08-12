@@ -78,6 +78,33 @@ def override_log_id(item_id: str) -> str:
     return f"override__{item_id}"
 
 
+def build_override_log(
+    estate_id: str,
+    item_id: str,
+    item_category: str,
+    ai_suggested_disposition: SuggestedDisposition,
+    executor_chosen_disposition: SuggestedDisposition,
+) -> OverrideLog:
+    """The log entry for one finalized decision, unwritten.
+
+    Split out from the write so `dispositions.py` can commit it in the same batch
+    as the Disposition row — the two have to land together or not at all.
+    """
+    return OverrideLog(
+        id=override_log_id(item_id),
+        estate_id=estate_id,
+        item_id=item_id,
+        item_category=item_category,
+        ai_suggested_disposition=SuggestedDisposition(ai_suggested_disposition),
+        executor_chosen_disposition=SuggestedDisposition(executor_chosen_disposition),
+    )
+
+
+def override_log_document(entry: OverrideLog) -> dict:
+    """The Firestore-writable form of a log entry."""
+    return _to_firestore(entry)
+
+
 def write_override_log(
     estate_id: str,
     item_id: str,
@@ -85,14 +112,13 @@ def write_override_log(
     ai_suggested_disposition: SuggestedDisposition,
     executor_chosen_disposition: SuggestedDisposition,
 ) -> OverrideLog:
-    """Record one finalized decision. Called by dispositions.py, not directly."""
-    entry = OverrideLog(
-        id=override_log_id(item_id),
-        estate_id=estate_id,
-        item_id=item_id,
-        item_category=item_category,
-        ai_suggested_disposition=SuggestedDisposition(ai_suggested_disposition),
-        executor_chosen_disposition=SuggestedDisposition(executor_chosen_disposition),
+    """Record one finalized decision on its own. Called by dispositions.py."""
+    entry = build_override_log(
+        estate_id,
+        item_id,
+        item_category,
+        ai_suggested_disposition,
+        executor_chosen_disposition,
     )
     get_db().collection(OverrideLog.COLLECTION).document(entry.id).set(
         _to_firestore(entry)
