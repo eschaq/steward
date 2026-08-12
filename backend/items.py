@@ -14,6 +14,20 @@ from models import Item, ItemStatus, SuggestedDisposition
 from overrides import DispositionSuggestion, suggest_disposition
 
 
+# Statuses where a suggestion is still worth anything. A `resolved` item's
+# disposition has already been decided by a person, and `routed` is further along
+# still — reaching back to change what the agent suggests would be rewriting
+# advice nobody is waiting on. `needs_clarification` is excluded for the opposite
+# reason: the agent doesn't yet know what the item is.
+SUGGESTION_ELIGIBLE_STATUSES = frozenset(
+    {ItemStatus.UNCLAIMED, ItemStatus.CLAIMED, ItemStatus.CONTESTED}
+)
+
+
+class ItemError(Exception):
+    """The item asked about doesn't exist."""
+
+
 def _to_firestore(item: Item) -> dict:
     return {
         key: value.value if isinstance(value, Enum) else value
@@ -37,6 +51,59 @@ def suggestion_for(
         ai_classification_confidence=classification.ai_classification_confidence,
         identified=not classification.needs_clarification,
     )
+
+
+def recompute_suggestion(item_id: str) -> DispositionSuggestion:
+    """Re-derive an item's suggested_disposition from the estate's history now.
+
+    The suggestion written at classification time is a snapshot: it reflects the
+    override history as it stood that day, and later decisions in the same
+    category never reached it. This re-runs the same weighting function against
+    the current history and writes the result back if it moved.
+
+    Items outside SUGGESTION_ELIGIBLE_STATUSES are a no-op, not an error — the
+    stored value is returned untouched, with a reason saying why it was left
+    alone.
+
+    The baseline is `uncertain`, deliberately, rather than whatever is currently
+    stored. That means the suggestion always reflects the history as it stands:
+    if the pattern that produced `donate` later evens out, this walks the item
+    back to `uncertain` instead of leaving a lean nothing supports any more.
+    """
+    doc_ref = get_db().collection(Item.COLLECTION).document(item_id)
+    snapshot = doc_ref.get()
+    if not snapshot.exists:
+        raise ItemError(f"No item {item_id} to recompute a suggestion for.")
+
+    item = Item.model_validate(snapshot.to_dict())
+
+    if item.status not in SUGGESTION_ELIGIBLE_STATUSES:
+        return DispositionSuggestion(
+            suggested_disposition=item.suggested_disposition,
+            reason=(
+                f"This item is {item.status.value}, so its disposition isn't the "
+                "agent's to suggest any more — leaving it as it is."
+            ),
+            has_pattern=False,
+            ai_classification_confidence=item.ai_classification_confidence,
+        )
+
+    # An eligible status is itself the evidence the item is identified: classify
+    # routes anything below the confidence threshold to `needs_clarification`,
+    # which is excluded above. The stored confidence is the classifier's original
+    # read and can be stale by now; the status is current.
+    suggestion = suggest_disposition(
+        estate_id=item.estate_id,
+        item_category=item.ai_category,
+        baseline=SuggestedDisposition.UNCERTAIN,
+        ai_classification_confidence=item.ai_classification_confidence,
+        identified=True,
+    )
+
+    if suggestion.suggested_disposition is not item.suggested_disposition:
+        doc_ref.update({"suggested_disposition": suggestion.suggested_disposition.value})
+
+    return suggestion
 
 
 def create_item_from_classification(

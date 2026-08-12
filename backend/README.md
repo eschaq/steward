@@ -24,6 +24,7 @@ behaviors. No HTTP API yet.
 | `test_resolutions.py`| Script: beneficiary refused, executor resolves, unclaimed refused |
 | `test_overrides.py`  | Script: same photo, cold start vs. after the estate has a habit  |
 | `test_dispositions.py`| Script: a decision writes both docs; uncertain/unresolved refused |
+| `test_recompute.py`  | Script: a stale suggestion catches up; a resolved one is left alone |
 | `requirements.txt`   | `firebase-admin`, `pydantic`, `google-generativeai`, …          |
 
 ## Membership
@@ -176,6 +177,52 @@ Surfacing that in the UI or the feed is not wired up yet.
 carries the thinness honestly ("has donated the one armchair item so far")
 instead of a hidden threshold silently ignoring it. Raise the constant if one
 data point turns out to feel jumpy in the demo.
+
+### Keeping a suggestion current
+
+The suggestion written at classification time is a **snapshot** — it reflects the
+override history as it stood that day, and later decisions in the same category
+never reach it on their own. `items.recompute_suggestion(item_id)` re-runs the
+same weighting function against the history as it stands now and writes the
+result back if it moved:
+
+```python
+recompute_suggestion("item-1").suggested_disposition   # DONATE, and stored
+```
+
+- **Only `unclaimed` / `claimed` / `contested` are recomputed.** A `resolved`
+  item's disposition has already been decided by a person, and `routed` is
+  further along still — reaching back to change what the agent suggests would be
+  rewriting advice nobody is waiting on. `needs_clarification` is excluded for
+  the opposite reason: the agent doesn't know what the item is yet.
+- **An ineligible item is a no-op, not an error.** The stored value comes back
+  untouched with a reason saying why it was left alone.
+- **The baseline is `uncertain`, not the stored value.** So the suggestion always
+  reflects current history: if the pattern that produced `donate` later evens
+  out, recompute walks the item back to `uncertain` rather than leaving a lean
+  nothing supports any more.
+- **Status is never touched** — this changes advice, not where the item sits in
+  the flow.
+
+Nothing calls it automatically yet. The natural trigger is
+`record_disposition_decision`, fanning out to the estate's other items in the
+same category; that's a write per item, so it wants a deliberate decision rather
+than a quiet default.
+
+Verified run against real Firestore (`test_recompute.py`):
+
+```
+item created with no 'armchair' history   -> stored uncertain
+...4 decisions land (donate, donate, sell, donate)
+same item, still untouched                -> stored uncertain   (the snapshot problem)
+recompute_suggestion(item)                -> donate, and the document now says donate
+                                             status still unclaimed; second call stable
+
+a resolved item, same category            -> weighting would say donate
+recompute_suggestion(item)                -> uncertain, unchanged, "This item is
+                                             resolved, so its disposition isn't the
+                                             agent's to suggest any more"
+```
 
 ### Where the decision comes from
 
@@ -450,6 +497,7 @@ gcloud auth application-default set-quota-project steward-hackathon-505217
 .venv/bin/python test_resolutions.py
 .venv/bin/python test_overrides.py
 .venv/bin/python test_dispositions.py
+.venv/bin/python test_recompute.py
 ```
 
 `test_classify.py` exit codes: `0` both cases behaved, `1` a real logic failure,
