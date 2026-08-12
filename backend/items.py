@@ -9,7 +9,8 @@ from typing import Optional
 
 from classify import Classification, classify_image
 from firebase_app import get_db
-from models import Item, SuggestedDisposition
+from messages import post_clarifying_question
+from models import Item, ItemStatus, SuggestedDisposition
 
 
 def _to_firestore(item: Item) -> dict:
@@ -33,6 +34,10 @@ def create_item_from_classification(
     suggested_disposition stays `uncertain` for now: per the data model it is
     meant to be weighted by this estate's OverrideLog history, and that loop
     isn't built yet. A one-shot guess here is explicitly what the RDD rejects.
+
+    An item that lands in `needs_clarification` gets the agent's clarifying
+    question posted to the Message Center — the status alone is a dead end for
+    the family, since nothing tells them the agent wants a hand.
     """
     db = get_db()
     doc_ref = db.collection(Item.COLLECTION).document(item_id) if item_id else (
@@ -51,6 +56,15 @@ def create_item_from_classification(
         status=classification.status,
     )
     doc_ref.set(_to_firestore(item))
+
+    if item.status is ItemStatus.NEEDS_CLARIFICATION:
+        post_clarifying_question(
+            estate_id=item.estate_id,
+            item_id=item.id,
+            ai_category=item.ai_category,
+            ai_condition_notes=item.ai_condition_notes,
+        )
+
     return item
 
 

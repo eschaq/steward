@@ -16,6 +16,7 @@ from typing import Optional
 from google.cloud.firestore_v1.base_query import FieldFilter
 
 from firebase_app import get_db
+from messages import post_contested_mediation
 from models import Claim, Item, ItemStatus
 
 # Statuses this module owns. An item that has been resolved or routed has moved
@@ -87,19 +88,35 @@ def recompute_item_status(item_id: str) -> ItemStatus:
     Returns the item's status after the call. Items sitting in `resolved`,
     `routed`, or `needs_clarification` are returned unchanged — see
     CLAIMABLE_STATUSES.
+
+    On the *transition* into `contested` — and only then — the agent posts its
+    mediating suggestion to the Message Center. Recomputing an item that was
+    already contested changes nothing and says nothing.
     """
     doc_ref = get_db().collection(Item.COLLECTION).document(item_id)
     snapshot = doc_ref.get()
     if not snapshot.exists:
         raise ClaimError(f"No item {item_id} to recompute status for.")
 
-    current = ItemStatus(snapshot.to_dict()["status"])
+    data = snapshot.to_dict()
+    current = ItemStatus(data["status"])
     if current not in CLAIMABLE_STATUSES:
         return current
 
-    new_status = status_for_claimant_count(count_distinct_claimants(item_id))
-    if new_status != current:
-        doc_ref.update({"status": new_status.value})
+    claims = get_claims_for_item(item_id)
+    # Claimant order follows claimed_at, so the mediation message names people
+    # in the order they actually spoke up.
+    claimant_ids = list(dict.fromkeys(claim.user_id for claim in claims))
+
+    new_status = status_for_claimant_count(len(claimant_ids))
+    if new_status == current:
+        return new_status
+
+    doc_ref.update({"status": new_status.value})
+
+    if new_status is ItemStatus.CONTESTED:
+        post_contested_mediation(data["estate_id"], item_id, claimant_ids)
+
     return new_status
 
 

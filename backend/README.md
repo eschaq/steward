@@ -1,21 +1,24 @@
 # Steward — backend
 
-Tier 1 Pydantic models, Firestore initialization, estate membership
-(Auth users, invites, role checks), and claims. No HTTP API or agent logic yet.
+Tier 1 Pydantic models, Firestore initialization, estate membership (Auth users,
+invites, role checks), claims, and the Message Center with its two agent
+behaviors. No HTTP API yet.
 
-| File                 | Purpose                                                       |
-| -------------------- | ------------------------------------------------------------- |
-| `models.py`          | Pydantic models for Estate, User, EstateMembership, Claim, Item |
-| `firebase_app.py`    | Initializes the Admin SDK once per process; `get_db()`         |
-| `membership.py`      | Create Auth user, invite to estate, accept invite, role check  |
-| `classify.py`        | Photo → the four `ai_*` Item fields, via the Gemini API        |
-| `items.py`           | Writes a classified photo out as an Item document              |
-| `claims.py`          | Record a claim; re-derive item status from its claims          |
-| `init_firestore.py`  | Seeds one document per collection and reads it back            |
-| `test_membership.py` | Script: invite + accept two users, print each role             |
-| `test_classify.py`   | Script: classify a real photo and a blank square, store both   |
-| `test_claims.py`     | Script: claim one item alone, another twice, check statuses    |
-| `requirements.txt`   | `firebase-admin`, `pydantic`, `google-generativeai`, …         |
+| File                 | Purpose                                                        |
+| -------------------- | -------------------------------------------------------------- |
+| `models.py`          | Pydantic models for Estate, User, EstateMembership, Message, Claim, Item |
+| `firebase_app.py`    | Initializes the Admin SDK once per process; `get_db()`          |
+| `membership.py`      | Create Auth user, invite to estate, accept invite, role check   |
+| `classify.py`        | Photo → the four `ai_*` Item fields, via the Gemini API         |
+| `items.py`           | Writes a classified photo out as an Item document               |
+| `claims.py`          | Record a claim; re-derive item status from its claims           |
+| `messages.py`        | The feed, the agent User, and the agent's two behaviors         |
+| `init_firestore.py`  | Seeds one document per collection and reads it back             |
+| `test_membership.py` | Script: invite + accept two users, print each role              |
+| `test_classify.py`   | Script: classify a real photo and a blank square, store both    |
+| `test_claims.py`     | Script: claim one item alone, another twice, check statuses     |
+| `test_messages.py`   | Script: both agent behaviors fire once, and only once           |
+| `requirements.txt`   | `firebase-admin`, `pydantic`, `google-generativeai`, …          |
 
 ## Membership
 
@@ -43,6 +46,77 @@ Behavior worth knowing:
   acceptance, and accepting twice keeps the first `accepted_at`.
 - Inviting an email with no Auth account raises `MembershipError` rather than
   writing a membership that points at nobody.
+
+## Message Center
+
+`messages.py` is one unified feed — item-specific and general estate discussion
+in the same `messages` collection, `item_id` null for the latter. Per the data
+model, the agent posts here through the same table humans use; there is no
+separate notification system.
+
+```python
+post_message(estate_id, uid, "Planning to come by Saturday.")          # general
+post_message(estate_id, uid, "I remember this one.", item_id="item-1") # about an item
+
+get_messages_for_item("item-1")     # [Message, …], oldest first
+get_messages_for_estate(estate_id)  # the whole feed
+get_agent_user()                    # the User that authors agent messages
+```
+
+### The agent user
+
+`get_agent_user()` returns the `role_type=agent` User, creating it only if there
+isn't one: it checks the well-known id `steward-agent` first, then any other user
+with `role_type=agent` (so a row created elsewhere is adopted, not duplicated).
+
+It is a Firestore document only — **no Firebase Auth account**, deliberately. The
+agent never signs in, and giving it credentials would put a non-human principal
+inside the auth boundary `membership.py` exists to hold.
+
+### The two behaviors
+
+| Behavior          | Trigger                                   | Hooked into                    |
+| ----------------- | ----------------------------------------- | ------------------------------ |
+| Clarifying question | item lands in `needs_clarification`      | `items.create_item_from_classification` |
+| Contested mediation | item *transitions into* `contested`      | `claims.recompute_item_status` |
+
+- **Fires on the transition, not the state.** `recompute_item_status` compares
+  the status before and after; an item that was already contested gets no second
+  message no matter how often recompute runs.
+- **Deterministic message ids** (`agent-clarify__{item_id}`,
+  `agent-mediate__{item_id}`) back that up at the storage layer, so the agent
+  says a given thing about a given item exactly once. `_post_once` checks for the
+  document and returns `None` instead of overwriting, which keeps the original
+  `created_at` intact.
+- **A failed post never propagates.** The upload or the claim that triggered it
+  has already committed; losing that work over a feed write would be worse than a
+  missing message. The failure prints to stderr rather than being swallowed.
+- **The clarifying question offers its half-formed guess when it has one** ("It
+  might be a vase, but I'd rather ask than guess") and shrugs plainly when it
+  doesn't. Either way the family sees no confidence scores or thresholds — the
+  test asserts that internal vocabulary stays out of the copy.
+- The mediation message names the claimants in the order they spoke up, then
+  **proposes a way through** — acknowledging the conflict alone leaves the family
+  where they started. It covers all three paths the data model's Resolution types
+  allow (assign to one claimant, share/rotate, outside appraisal) as prose, not a
+  bulleted menu: a list of choices reads like a form to fill in, wrong for the
+  moment this message lands in. The test asserts at least one path is named and
+  that no bullets appear. No urgency, no nudging — tone per
+  `docs/estate-agent-branding.md`.
+
+One known gap: an item that went contested, got resolved, and somehow became
+contested again would not be mediated a second time. It can't happen through the
+current code — `resolved` is outside `CLAIMABLE_STATUSES`, so recompute never
+touches it — but the deterministic id is what would suppress it if that changed.
+
+Verified run against real Firestore (`test_messages.py`):
+
+```
+(a) blank square -> needs_clarification -> 1 clarifying message, agent-authored
+(b) 2nd claimant -> contested            -> 1 mediation message, on the transition
+    (after the 1st claim: 0 messages — one claimant isn't a conflict)
+(c) recompute while already contested    -> still 1, created_at unchanged
+```
 
 ## Claims
 
@@ -77,8 +151,8 @@ Behavior worth knowing:
   claim.
 - Querying claims by `item_id` is a single-field equality filter, so Firestore's
   automatic index covers it — no composite index to deploy.
-- Posting the mediation message when an item flips to `contested` is not wired up
-  yet — `Message` has no model. The status transition is the trigger for it.
+- **The transition into `contested` posts the agent's mediation message** — see
+  Message Center below. Recomputing an item that was already contested is silent.
 
 Verified run against real Firestore (`test_claims.py`), both transitions:
 
@@ -159,6 +233,7 @@ gcloud auth application-default set-quota-project steward-hackathon-505217
 .venv/bin/python test_membership.py
 .venv/bin/python test_classify.py
 .venv/bin/python test_claims.py
+.venv/bin/python test_messages.py
 ```
 
 `test_classify.py` exit codes: `0` both cases behaved, `1` a real logic failure,
@@ -215,4 +290,5 @@ Without the first call, every Admin SDK Auth call fails with
 
 - Project: `steward-hackathon-505217`
 - Database: `(default)`, Native mode, location `nam5` (US multi-region), free tier
-- Collections: `estates`, `users`, `estate_memberships`, `items`, `claims`
+- Collections: `estates`, `users`, `estate_memberships`, `items`, `claims`,
+  `messages`

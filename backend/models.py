@@ -79,6 +79,25 @@ class EstateMembership(BaseModel):
     accepted_at: Optional[datetime] = None
 
 
+class Message(BaseModel):
+    """One entry in the estate's single unified feed.
+
+    Item-specific and general messages live in the same collection — `item_id`
+    is null for general estate discussion. Do not split this by scope.
+    """
+
+    COLLECTION: ClassVar[str] = "messages"
+
+    id: str
+    estate_id: str
+    # Null for general estate discussion, set when the message is about an item.
+    item_id: Optional[str] = None
+    # May be a human or the `agent` role_type user.
+    user_id: str
+    text: str
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
 class Claim(BaseModel):
     COLLECTION: ClassVar[str] = "claims"
 
