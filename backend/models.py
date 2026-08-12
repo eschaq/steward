@@ -79,6 +79,27 @@ class EstateMembership(BaseModel):
     accepted_at: Optional[datetime] = None
 
 
+class ResolutionType(str, Enum):
+    ASSIGNED_TO_CLAIMANT = "assigned_to_claimant"
+    ROTATION = "rotation"
+    OUTSIDE_APPRAISAL = "outside_appraisal"
+    EXECUTOR_OVERRIDE = "executor_override"
+
+
+class Resolution(BaseModel):
+    COLLECTION: ClassVar[str] = "resolutions"
+
+    id: str
+    item_id: str
+    # Must hold the executor role on the item's estate — enforced in resolutions.py.
+    resolved_by_user_id: str
+    resolution_type: ResolutionType
+    # Set when the item goes to a specific person (assigned/rotation).
+    resolved_to_user_id: Optional[str] = None
+    notes: str = ""
+    resolved_at: datetime = Field(default_factory=_utcnow)
+
+
 class Message(BaseModel):
     """One entry in the estate's single unified feed.
 

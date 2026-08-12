@@ -13,11 +13,13 @@ behaviors. No HTTP API yet.
 | `items.py`           | Writes a classified photo out as an Item document               |
 | `claims.py`          | Record a claim; re-derive item status from its claims           |
 | `messages.py`        | The feed, the agent User, and the agent's two behaviors         |
+| `resolutions.py`     | Executor resolves a claimed/contested item; flips to `resolved` |
 | `init_firestore.py`  | Seeds one document per collection and reads it back             |
 | `test_membership.py` | Script: invite + accept two users, print each role              |
 | `test_classify.py`   | Script: classify a real photo and a blank square, store both    |
 | `test_claims.py`     | Script: claim one item alone, another twice, check statuses     |
 | `test_messages.py`   | Script: both agent behaviors fire once, and only once           |
+| `test_resolutions.py`| Script: beneficiary refused, executor resolves, unclaimed refused |
 | `requirements.txt`   | `firebase-admin`, `pydantic`, `google-generativeai`, …          |
 
 ## Membership
@@ -46,6 +48,60 @@ Behavior worth knowing:
   acceptance, and accepting twice keeps the first `accepted_at`.
 - Inviting an email with no Auth account raises `MembershipError` rather than
   writing a membership that points at nobody.
+
+## Resolutions
+
+`resolutions.py` records the executor's decision on a claimed or contested item
+and flips it to `resolved` — the state that makes it eligible for Disposition,
+the seam Tier 2 and Tier 3 attach at.
+
+```python
+resolve_item(
+    "item-1",
+    resolved_by_user_id=executor_uid,
+    resolution_type=ResolutionType.ROTATION,
+    resolved_to_user_id=claimant_uid,
+    notes="Two years at Ana's, then two at Sam's.",
+)
+
+get_resolution("item-1")   # Resolution | None
+```
+
+Two gates, and both raise rather than shrug:
+
+- **Authorization** — `require_role(uid, estate_id, EXECUTOR)`, so this module
+  has no second, divergent idea of what an executor is. A beneficiary gets
+  `MembershipError`. Checked *before* the state gate, so a non-executor learns
+  they may not do this rather than learning about the item's state first.
+- **State** — only `claimed` and `contested` are resolvable. `unclaimed` has
+  nothing to decide, `needs_clarification` isn't identified yet, and
+  `resolved`/`routed` are already past this point. Each raises `ResolutionError`
+  naming the actual reason, not a generic rejection.
+
+Both errors are raised before anything is written — the test asserts the refused
+cases leave no Resolution document and the item's status untouched.
+
+Other behavior worth knowing:
+
+- **`assigned_to_claimant` and `rotation` require `resolved_to_user_id`, and it
+  must be someone who actually claimed the item.** Handing the item to a
+  non-claimant is a different decision and the data model has a type for it:
+  `executor_override`. The other two types leave the field optional.
+- **One resolution per item, via a deterministic id** (`resolution__{item_id}`).
+  The status gate already allows resolving exactly once; pinning the id makes
+  that structural rather than merely emergent.
+- Resolution does **not** post to the Message Center. The two agent behaviors in
+  Tier 1 are the clarifying question and contested mediation — adding a third
+  here would be scope the RDD didn't ask for.
+
+Verified run against real Firestore (`test_resolutions.py`):
+
+```
+(a) beneficiary resolves contested  -> MembershipError, nothing written
+(b) executor resolves as rotation   -> status resolved, all fields read back
+    second resolution on that item  -> ResolutionError
+(c) executor resolves unclaimed     -> ResolutionError, item still unclaimed
+```
 
 ## Message Center
 
@@ -234,6 +290,7 @@ gcloud auth application-default set-quota-project steward-hackathon-505217
 .venv/bin/python test_classify.py
 .venv/bin/python test_claims.py
 .venv/bin/python test_messages.py
+.venv/bin/python test_resolutions.py
 ```
 
 `test_classify.py` exit codes: `0` both cases behaved, `1` a real logic failure,
@@ -291,4 +348,4 @@ Without the first call, every Admin SDK Auth call fails with
 - Project: `steward-hackathon-505217`
 - Database: `(default)`, Native mode, location `nam5` (US multi-region), free tier
 - Collections: `estates`, `users`, `estate_memberships`, `items`, `claims`,
-  `messages`
+  `messages`, `resolutions`
