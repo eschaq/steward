@@ -23,6 +23,7 @@ authentication, which is what Cloud Run serves.
 | `overrides.py`       | OverrideLog + the adaptive suggestion loop                       |
 | `dispositions.py`    | Executor's final call: writes the Disposition row + OverrideLog  |
 | `init_firestore.py`  | Seeds one document per collection and reads it back             |
+| `seed_demo_items.py` | Demo inventory for the dashboard — **not** a test fixture       |
 | `test_membership.py` | Script: invite + accept two users, print each role              |
 | `test_classify.py`   | Script: classify a real photo and a blank square, store both    |
 | `test_claims.py`     | Script: claim one item alone, another twice, check statuses     |
@@ -682,6 +683,33 @@ gcloud auth application-default set-quota-project steward-hackathon-505217
 .venv/bin/python test_api.py
 .venv/bin/python test_endpoints.py
 ```
+
+### Demo data
+
+```bash
+.venv/bin/python seed_demo_items.py
+```
+
+Adds 14 varied belongings to `seed-estate-001` so the dashboard looks like an
+estate rather than the near-identical fixtures the suites leave behind. Nothing
+in the test suites touches these, and this touches nothing they create.
+
+**Hand-seeded, not agent-classified.** Every `ai_*` value is written by hand and
+plausible; none of it went through `classify.py`. Provenance lives in the
+document id, because Item's shape is fixed by the data model doc and this script
+does not get to add a `source` field:
+
+| Prefix | Origin |
+| ------ | ------ |
+| `demo-` | `seed_demo_items.py` — hand-written |
+| `test-` | backend verification suites |
+| anything else | the real pipeline, `classify.py` → `items.py` |
+
+It writes Claims behind every `claimed`/`contested` item and Resolutions behind
+every `resolved`/`routed` one, so no status is a label with nothing under it. It
+deliberately writes **no Disposition or OverrideLog rows**: those would change
+what the agent suggests for future items in those categories, and seed data
+should not quietly retrain the adaptive loop.
 
 All ten pass against Vertex AI and real Firestore. `test_classify`,
 `test_overrides`, and `test_recompute` make live Gemini calls; the other six make
