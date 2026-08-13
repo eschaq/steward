@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Steward - Message Center</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&amp;family=Work+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "tertiary-fixed-dim": "#d2c5b1",
+                      "on-primary": "#ffffff",
+                      "secondary": "#54634a",
+                      "tertiary-container": "#7e7362",
+                      "on-surface-variant": "#54433e",
+                      "on-primary-fixed-variant": "#74341e",
+                      "surface-container-lowest": "#ffffff",
+                      "surface-container-highest": "#ebe1da",
+                      "on-secondary-fixed-variant": "#3d4b34",
+                      "on-background": "#1f1b17",
+                      "surface": "#fff8f4",
+                      "inverse-primary": "#ffb59d",
+                      "error": "#ba1a1a",
+                      "surface-tint": "#914b33",
+                      "on-secondary": "#ffffff",
+                      "outline": "#87736d",
+                      "on-error-container": "#93000a",
+                      "on-error": "#ffffff",
+                      "primary": "#8e4831",
+                      "outline-variant": "#d9c1ba",
+                      "on-tertiary-fixed-variant": "#4e4637",
+                      "primary-fixed-dim": "#ffb59d",
+                      "surface-container-low": "#fcf2ea",
+                      "tertiary": "#645b4b",
+                      "secondary-container": "#d7e8c8",
+                      "surface-container": "#f6ece5",
+                      "on-secondary-fixed": "#121f0b",
+                      "error-container": "#ffdad6",
+                      "surface-variant": "#ebe1da",
+                      "on-secondary-container": "#5a6950",
+                      "inverse-surface": "#352f2b",
+                      "surface-bright": "#fff8f4",
+                      "surface-dim": "#e2d8d1",
+                      "primary-container": "#ac6046",
+                      "primary-fixed": "#ffdbd0",
+                      "surface-container-high": "#f1e6df",
+                      "on-primary-fixed": "#390b00",
+                      "secondary-fixed-dim": "#bbccad",
+                      "on-tertiary-fixed": "#211b0e",
+                      "on-primary-container": "#fffbff",
+                      "background": "#fff8f4",
+                      "secondary-fixed": "#d7e8c8",
+                      "on-tertiary": "#ffffff",
+                      "on-tertiary-container": "#fffbff",
+                      "inverse-on-surface": "#f9efe8",
+                      "on-surface": "#1f1b17",
+                      "tertiary-fixed": "#efe1cc"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "gutter": "24px",
+                      "section-gap": "64px",
+                      "container-max": "1120px",
+                      "element-gap": "16px",
+                      "margin-mobile": "20px",
+                      "unit": "8px"
+              },
+              "fontFamily": {
+                      "headline-lg": ["\"Source Serif 4\""],
+                      "headline-lg-mobile": ["\"Source Serif 4\""],
+                      "headline-md": ["\"Source Serif 4\""],
+                      "display-lg": ["\"Source Serif 4\""],
+                      "body-lg": ["Work Sans"],
+                      "body-md": ["Work Sans"],
+                      "label-md": ["Work Sans"],
+                      "label-sm": ["Work Sans"]
+              },
+              "fontSize": {
+                      "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "600"}],
+                      "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "600"}],
+                      "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "500"}],
+                      "display-lg": ["42px", {"lineHeight": "52px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                      "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                      "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                      "label-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500"}],
+                      "label-sm": ["12px", {"lineHeight": "16px", "letterSpacing": "0.03em", "fontWeight": "600"}]
+              }
+            }
+          }
+        }
+    </script>
+<style>
+        body { background-color: theme('colors.background'); }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom, 20px); }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="text-on-background font-body-md antialiased min-h-screen pb-24">
+<!-- TopAppBar -->
+<header class="w-full top-0 sticky bg-background z-40">
+<div class="flex justify-between items-center h-16 px-gutter max-w-container-max mx-auto">
+<button aria-label="Menu" class="text-primary p-2 -ml-2 rounded-full hover:bg-secondary-container/10 transition-colors focus:outline-none">
+<span class="material-symbols-outlined" data-icon="menu">menu</span>
+</button>
+<h1 class="font-headline-lg text-headline-lg text-primary tracking-tight">Steward</h1>
+<button aria-label="User profile" class="w-8 h-8 rounded-full overflow-hidden border border-outline-variant focus:outline-none hover:opacity-80 transition-opacity">
+<img alt="" class="w-full h-full object-cover" data-alt="A small, soft-focus profile portrait of an older woman with silver hair, lit by warm natural sunlight in a minimalist interior with muted earth tones, conveying a sense of wisdom and calm." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBy5ot1MudnW5fgPoGw1iLPzYwJ2WnAH7q9yqdsJ1_8ObWKPtMC01rm70wxf56t0ehgAJrRUXyjTZH4RnWP_2sEdsFyzY9FjyNrgbjDpXQ3bXoEWJea480YVYMg8VPEIc01oL4sbBY8bV-kD9FfrdrL2yJsXOJR_JzFDZmZGS0APuZE38SlGgOMhq_un_GbutjTe93pJnYbymHf08LN9wsvN7g3_kF63dRuuFYlI-UDyLkLH-am2mdH"/>
+</button>
+</div>
+</header>
+<!-- Main Content -->
+<main class="px-margin-mobile md:px-gutter max-w-container-max mx-auto mt-unit md:hidden">
+<header class="mb-element-gap">
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface mb-2">Messages</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">A unified feed of discussions</p>
+</header>
+<!-- Message Feed -->
+<div class="flex flex-col gap-element-gap">
+<!-- Thread 1: Estate Discussion (Mediator active) -->
+<article class="bg-surface-container-low rounded-xl border border-outline-variant/30 p-4">
+<div class="flex justify-between items-start mb-3">
+<div>
+<span class="inline-flex items-center gap-1 text-secondary font-label-sm text-label-sm uppercase tracking-widest mb-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="forum">forum</span>
+                            General
+                        </span>
+<h3 class="font-headline-md text-headline-md text-on-surface text-[20px] leading-[28px]">Timeline for the house sale</h3>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">2h ago</span>
+</div>
+<div class="space-y-3 mt-4">
+<!-- Human Message -->
+<div class="flex gap-3">
+<div class="w-6 h-6 rounded-full bg-secondary-container flex-shrink-0 flex items-center justify-center text-on-secondary-container font-label-sm text-label-sm">E</div>
+<div class="bg-surface rounded-lg rounded-tl-none p-3 border border-outline-variant/20 max-w-[85%]">
+<p class="font-body-md text-body-md text-on-surface text-[15px] leading-[22px]">I think we should aim to list by September. That gives us enough time to sort through the garage.</p>
+</div>
+</div>
+<!-- AI Mediator Message -->
+<div class="flex gap-3 flex-row-reverse">
+<div class="w-6 h-6 rounded-full bg-primary-container/20 border border-primary/20 flex-shrink-0 flex items-center justify-center text-primary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px]" data-icon="psychiatry">psychiatry</span>
+</div>
+<div class="bg-primary-container/5 rounded-lg rounded-tr-none p-3 border border-primary/10 max-w-[85%] text-right">
+<p class="font-body-md text-body-md text-on-surface text-[15px] leading-[22px]">Listing in September provides a realistic window. To meet this, we would need to finalize the garage inventory by early August. Shall I create a gentle reminder schedule for this?</p>
+</div>
+</div>
+</div>
+</article>
+<!-- Thread 2: Item Specific -->
+<article class="bg-surface-container-low rounded-xl border border-outline-variant/30 p-4">
+<div class="flex justify-between items-start mb-3">
+<div class="flex gap-3">
+<div class="w-12 h-12 rounded-lg overflow-hidden border border-outline-variant/30 flex-shrink-0">
+<img alt="" class="w-full h-full object-cover" data-alt="A beautifully crafted antique oak dining table, positioned in a softly lit, minimalist room with warm cream walls. The lighting is unhurried and calming, casting gentle shadows that highlight the wood's rich, aged texture." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC_kel472sNZrxltgq4dNs12yTSlLDNBOiLfQDhUyM7Q_P3O_OB_-eE_vlRiwQC6HAYQe6YwvgCyxGvMWCytUg23ufyATdHvg07HusgPY8mkorYFbhIFBCIBaxWXksAjFA4lBgLI0fnc66pwhtk8Nn1EkKbUgWFCtlLyAV0bPZv72dWNEJk73PG_QI7E4EAtHMJ06uxDwm9P3xWYKHbInOnBPHrlCzC4KJ7q9Qef3UKTZMrjqDrH23G"/>
+</div>
+<div>
+<span class="inline-flex items-center gap-1 text-secondary font-label-sm text-label-sm uppercase tracking-widest mb-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="chair">chair</span>
+                                Item Thread
+                            </span>
+<h3 class="font-headline-md text-headline-md text-on-surface text-[20px] leading-[28px]">Regarding the Dining Table</h3>
+</div>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant mt-1">Yesterday</span>
+</div>
+<div class="space-y-3 mt-2">
+<div class="flex gap-3">
+<div class="w-6 h-6 rounded-full bg-tertiary-container flex-shrink-0 flex items-center justify-center text-on-tertiary-container font-label-sm text-label-sm">M</div>
+<div class="bg-surface rounded-lg rounded-tl-none p-3 border border-outline-variant/20">
+<p class="font-body-md text-body-md text-on-surface text-[15px] leading-[22px] truncate">I'd really love to keep this if no one else has claimed it. It holds so many memories.</p>
+</div>
+</div>
+</div>
+</article>
+<!-- Thread 3: Quiet Thread -->
+<article class="bg-surface-container-low rounded-xl border border-outline-variant/30 p-4 opacity-80">
+<div class="flex justify-between items-start mb-3">
+<div>
+<span class="inline-flex items-center gap-1 text-secondary font-label-sm text-label-sm uppercase tracking-widest mb-1">
+<span class="material-symbols-outlined text-[14px]" data-icon="folder">folder</span>
+                            Documents
+                        </span>
+<h3 class="font-headline-md text-headline-md text-on-surface text-[20px] leading-[28px]">Appraisal Documents</h3>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Oct 12</span>
+</div>
+<div class="flex gap-2 items-center text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px]" data-icon="done_all">done_all</span>
+<span class="font-body-md text-body-md text-[14px]">All documents have been securely uploaded.</span>
+</div>
+</article>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center h-16 pb-safe px-4 bg-surface-container z-50 md:hidden">
+<!-- Inactive: Inventory -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant py-1 px-4 w-1/3 hover:text-primary transition-all" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="grid_view">grid_view</span>
+<span class="font-label-sm text-label-sm">Inventory</span>
+</a>
+<!-- Active: Messages -->
+<a class="flex flex-col items-center justify-center text-primary bg-secondary-container/30 rounded-full py-1 px-4 w-1/3 scale-95 transition-transform duration-150" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="chat_bubble" style="font-variation-settings: 'FILL' 1;">chat_bubble</span>
+<span class="font-label-sm text-label-sm">Messages</span>
+</a>
+<!-- Inactive: Family -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant py-1 px-4 w-1/3 hover:text-primary transition-all" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="group">group</span>
+<span class="font-label-sm text-label-sm">Family</span>
+</a>
+</nav>
+</body></html>

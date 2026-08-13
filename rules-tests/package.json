@@ -1,0 +1,14 @@
+{
+  "name": "steward-rules-tests",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Firestore Security Rules tests for Steward, run against the emulator.",
+  "scripts": {
+    "test": "firebase emulators:exec --only firestore --project steward-hackathon-505217 \"node rules.test.mjs\""
+  },
+  "dependencies": {
+    "@firebase/rules-unit-testing": "^5.0.1",
+    "firebase": "^12.17.1"
+  }
+}

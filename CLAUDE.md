@@ -16,7 +16,10 @@ Hackathon (Collaborative Partner track). Deadline: Aug 31, 2026.
 
 ## Stack — locked, do not relitigate
 
-- Gemini 3.5 (mandatory hackathon requirement)
+- Gemini 3.5 (mandatory hackathon requirement), reached through **Vertex AI** via
+  the `google-genai` SDK on Application Default Credentials — no API keys. Blaze
+  billing is active; the old AI Studio key path and its 20-req/day free-tier cap
+  are gone. Vertex serves `gemini-3.5-flash` from `global`, not a named region.
 - Google ADK for agent orchestration
 - Cloud Run — **two services**, frontend and backend split. Frontend never touches
   Firestore/Storage directly — only through the backend API.

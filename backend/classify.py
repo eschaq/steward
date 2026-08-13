@@ -1,7 +1,9 @@
-"""Item photo classification via the Gemini API.
+"""Item photo classification on Vertex AI, via the `google-genai` SDK.
 
-Uses the `google-generativeai` SDK with a GEMINI_API_KEY from `.env` (direct
-Gemini API, not Vertex AI — GCP billing isn't enabled on this project yet).
+Transport is Vertex AI with Application Default Credentials — no API key, no
+`.env`. (It was the direct Gemini API with an AI Studio key until Blaze billing
+was enabled on the project.) The SDK arrived with `google-adk`, so this added no
+dependency.
 
 Returns exactly the four `ai_*` fields defined for Item in
 docs/estate-agent-data-model.md — nothing invented, nothing omitted.
@@ -18,14 +20,21 @@ import os
 from pathlib import Path
 from typing import Optional
 
-import google.generativeai as genai
-from dotenv import load_dotenv
+from google import genai
+from google.genai import types
 from pydantic import BaseModel, Field, ValidationError
 
+from firebase_app import PROJECT_ID
 from models import ItemStatus
 
 # Gemini Flash by default; Pro is reserved for complex final reasoning (CLAUDE.md).
 DEFAULT_MODEL = "gemini-3.5-flash"
+
+# Vertex serves gemini-3.5-flash from `global`, not from a named region — asking
+# us-central1 for it returns 404 even though the project has access there (other
+# models, e.g. gemini-2.5-flash, answer from us-central1 fine). Override with
+# VERTEX_LOCATION if a future model is region-pinned.
+DEFAULT_LOCATION = os.environ.get("VERTEX_LOCATION", "global")
 
 # Below this, the agent asks instead of guessing (RDD failure-handling section).
 CONFIDENCE_THRESHOLD = 0.6
@@ -33,23 +42,22 @@ CONFIDENCE_THRESHOLD = 0.6
 # What the executor sees when the classifier could not do its job at all.
 CLASSIFICATION_FAILED_NOTE = "Couldn't classify this one — take a look?"
 
-def _response_schema() -> "genai.protos.Schema":
+def _response_schema() -> types.Schema:
     """Constrain generation to the four ai_* fields, so the model can't drift.
 
     Only ai_est_era_or_brand is nullable — the other three always come back.
+    Same schema as before the Vertex move, in the `google-genai` type.
     """
-    string = genai.protos.Schema(type=genai.protos.Type.STRING)
-    return genai.protos.Schema(
-        type=genai.protos.Type.OBJECT,
+    string = types.Schema(type=types.Type.STRING)
+    return types.Schema(
+        type=types.Type.OBJECT,
         properties={
             "ai_category": string,
             "ai_condition_notes": string,
-            "ai_est_era_or_brand": genai.protos.Schema(
-                type=genai.protos.Type.STRING, nullable=True
+            "ai_est_era_or_brand": types.Schema(
+                type=types.Type.STRING, nullable=True
             ),
-            "ai_classification_confidence": genai.protos.Schema(
-                type=genai.protos.Type.NUMBER
-            ),
+            "ai_classification_confidence": types.Schema(type=types.Type.NUMBER),
         },
         required=[
             "ai_category",
@@ -106,13 +114,32 @@ class Classification(BaseModel):
         return self.status is ItemStatus.NEEDS_CLARIFICATION
 
 
-def _model(model_name: Optional[str] = None) -> genai.GenerativeModel:
-    load_dotenv(Path(__file__).with_name(".env"))
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        raise RuntimeError("GEMINI_API_KEY is not set — add it to backend/.env")
-    genai.configure(api_key=api_key)
-    return genai.GenerativeModel(model_name or os.environ.get("GEMINI_MODEL", DEFAULT_MODEL))
+_CLIENT: Optional[genai.Client] = None
+
+
+def _client() -> genai.Client:
+    """A Vertex AI client on Application Default Credentials, built once.
+
+    Cached deliberately: the client owns an httpx connection pool and closes it
+    when collected, so a per-call client can be finalized out from under an
+    in-flight request ("Cannot send a request, as the client has been closed").
+    One per process, like the Firebase app.
+
+    On Cloud Run the attached service account supplies credentials
+    automatically; no key material is involved either way.
+    """
+    global _CLIENT
+    if _CLIENT is None:
+        _CLIENT = genai.Client(
+            vertexai=True,
+            project=os.environ.get("GOOGLE_CLOUD_PROJECT", PROJECT_ID),
+            location=DEFAULT_LOCATION,
+        )
+    return _CLIENT
+
+
+def _model_name(model_name: Optional[str] = None) -> str:
+    return model_name or os.environ.get("GEMINI_MODEL", DEFAULT_MODEL)
 
 
 def _unreadable(reason: str) -> Classification:
@@ -159,12 +186,16 @@ def classify_image(image_path: str | Path, model_name: Optional[str] = None) -> 
     mime_type = mimetypes.guess_type(path.name)[0] or "image/png"
 
     try:
-        response = _model(model_name).generate_content(
-            [PROMPT, {"mime_type": mime_type, "data": path.read_bytes()}],
-            generation_config={
-                "response_mime_type": "application/json",
-                "response_schema": _response_schema(),
-            },
+        response = _client().models.generate_content(
+            model=_model_name(model_name),
+            contents=[
+                PROMPT,
+                types.Part.from_bytes(data=path.read_bytes(), mime_type=mime_type),
+            ],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=_response_schema(),
+            ),
         )
         raw = (response.text or "").strip()
     except Exception as exc:  # noqa: BLE001 — any failure degrades the same way

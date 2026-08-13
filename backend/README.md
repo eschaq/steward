@@ -514,9 +514,20 @@ test-claim-item-a   same claimant again -> still claimed, 2 claims / 1 claimant
 
 ## Classification
 
-`classify.py` calls the Gemini API directly (API key from `.env`, see
-`.env.example`), not Vertex AI — GCP billing isn't enabled on this project.
-Model is `gemini-3.5-flash`; override with `GEMINI_MODEL`.
+`classify.py` calls **Vertex AI** through the `google-genai` SDK on Application
+Default Credentials — no API key, no `.env`. Model is `gemini-3.5-flash`;
+override with `GEMINI_MODEL`.
+
+**Location is `global`, not a named region.** Vertex serves `gemini-3.5-flash`
+from `global` only: asking `us-central1` for it returns 404 even though the
+project has Vertex access there (`gemini-2.5-flash` answers from `us-central1`
+fine, which is how we know it's the model and not the project). Override with
+`VERTEX_LOCATION` if a future model is region-pinned.
+
+The client is cached module-level on purpose. It owns an httpx connection pool
+and closes it when collected, so a per-call client can be finalized out from
+under its own in-flight request — `RuntimeError: Cannot send a request, as the
+client has been closed`. One per process, like the Firebase app.
 
 ```python
 c = classify_image("test_data/sample_item.png")
@@ -545,34 +556,35 @@ item, c = classify_and_create_item("seed-estate-001", "photo.png")   # items.py
   after otherwise valid JSON, and a good classification shouldn't be thrown away
   over trailing noise.
 
-Verified run — real photo, real API, real Firestore:
+Verified run on Vertex — real photo, real API, real Firestore. Identical results
+to the pre-migration run, which is the point:
 
 ```
 sample_item.png              armchair, "Louis XV style", confidence 0.98 -> unclaimed
-generated_blank_square.png   unknown, "solid greyish-blue ... no identifiable
-                             household items", confidence 0.0 -> needs_clarification
+generated_blank_square.png   unknown, confidence 0.0 -> needs_clarification
 ```
 
-### API key
+### Credentials
 
-`.env` holds the "Default Gemini API Key" from the `gen-lang-client-0376941757`
-project. The key originally in `.env` belonged to an AI Studio project whose
-prepayment credits were depleted — every model returned 429. Note that AI Studio
-keys are ordinary GCP API keys (`gcloud services api-keys list --project …`), but
-a key minted with `gcloud` against a project AI Studio doesn't know about is
-rejected as `API_KEY_INVALID`; the key has to come from AI Studio.
+Application Default Credentials, the same ones Firestore and Auth use — see the
+credentials note under "Running the scripts". On Cloud Run the attached service
+account supplies them automatically. **No key material anywhere.**
 
-### `google-generativeai` is deprecated
+The AI Studio API key path is gone: `.env`/`GEMINI_API_KEY` are no longer read by
+anything, and with them went the free tier's 20-requests-per-day cap that used to
+block `test_classify`, `test_overrides`, and `test_recompute` partway through a
+day. Blaze billing is active on the project.
 
-The SDK prints a deprecation warning on import (support ended; `google-genai` is
-the replacement) and its protobuf pin conflicts with `google-cloud-firestore`'s.
-Firestore works anyway — verified — but this is worth migrating before the
-frontend lands.
+### SDK
 
-`google-adk` now installs `google-genai` alongside it, so the replacement is
-already present and the migration is unblocked. The two coexist without issue —
-a live classification call succeeded on the current stack. See "Classification is
-not wrapped as a tool" above for why the migration is its own piece of work.
+`google-genai`, which `google-adk` already required — the migration added no
+dependency. `google-generativeai` (deprecated, and its protobuf pin conflicted
+with `google-cloud-firestore`'s) and `python-dotenv` were both uninstalled, and
+the full suite was re-run afterwards to prove nothing still reached for them.
+
+The migration was a transport change only. The `response_schema` constraint and
+the `raw_decode` tolerance for `gemini-3.5-flash`'s occasional stray `}` are
+unchanged, as are the prompt, the confidence threshold, and the degradation path.
 
 ## Running the scripts
 
@@ -596,16 +608,13 @@ gcloud auth application-default set-quota-project steward-hackathon-505217
 .venv/bin/python test_api.py
 ```
 
-### Gemini free-tier daily cap
+All nine pass against Vertex AI and real Firestore. `test_classify`,
+`test_overrides`, and `test_recompute` make live Gemini calls; the other six make
+none.
 
-`gemini-3.5-flash` on this project is capped at **20 `generateContent` requests
-per day** (`GenerateRequestsPerDayPerProjectPerModel-FreeTier`). `test_classify`,
-`test_overrides`, and `test_recompute` each spend one or two, so running the full
-set several times in a day exhausts it and those three start returning 429.
-
-They fail honestly when that happens — `test_overrides` and `test_recompute` exit
-`2` (BLOCKED, quota not logic) and say so. The other six suites, including
-`test_api`, use no Gemini quota at all and can be run freely.
+The AI Studio free tier's 20-requests-per-day cap no longer applies — it used to
+block those three partway through a day, and they still exit `2` (BLOCKED, quota
+not logic) rather than `1` if a quota wall ever reappears.
 
 `test_classify.py` exit codes: `0` both cases behaved, `1` a real logic failure,
 `2` the Gemini API refused both calls so classification quality could not be

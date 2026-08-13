@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Victorian Writing Desk - Steward</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900&amp;family=Work+Sans:ital,wght@0,100..900;1,100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "tertiary-fixed-dim": "#d2c5b1",
+                        "on-primary": "#ffffff",
+                        "secondary": "#54634a",
+                        "tertiary-container": "#7e7362",
+                        "on-surface-variant": "#54433e",
+                        "on-primary-fixed-variant": "#74341e",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-highest": "#ebe1da",
+                        "on-secondary-fixed-variant": "#3d4b34",
+                        "on-background": "#1f1b17",
+                        "surface": "#fff8f4",
+                        "inverse-primary": "#ffb59d",
+                        "error": "#ba1a1a",
+                        "surface-tint": "#914b33",
+                        "on-secondary": "#ffffff",
+                        "outline": "#87736d",
+                        "on-error-container": "#93000a",
+                        "on-error": "#ffffff",
+                        "primary": "#8e4831",
+                        "outline-variant": "#d9c1ba",
+                        "on-tertiary-fixed-variant": "#4e4637",
+                        "primary-fixed-dim": "#ffb59d",
+                        "surface-container-low": "#fcf2ea",
+                        "tertiary": "#645b4b",
+                        "secondary-container": "#d7e8c8",
+                        "surface-container": "#f6ece5",
+                        "on-secondary-fixed": "#121f0b",
+                        "error-container": "#ffdad6",
+                        "surface-variant": "#ebe1da",
+                        "on-secondary-container": "#5a6950",
+                        "inverse-surface": "#352f2b",
+                        "surface-bright": "#fff8f4",
+                        "surface-dim": "#e2d8d1",
+                        "primary-container": "#ac6046",
+                        "primary-fixed": "#ffdbd0",
+                        "surface-container-high": "#f1e6df",
+                        "on-primary-fixed": "#390b00",
+                        "secondary-fixed-dim": "#bbccad",
+                        "on-tertiary-fixed": "#211b0e",
+                        "on-primary-container": "#fffbff",
+                        "background": "#fff8f4",
+                        "secondary-fixed": "#d7e8c8",
+                        "on-tertiary": "#ffffff",
+                        "on-tertiary-container": "#fffbff",
+                        "inverse-on-surface": "#f9efe8",
+                        "on-surface": "#1f1b17",
+                        "tertiary-fixed": "#efe1cc"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "gutter": "24px",
+                        "section-gap": "64px",
+                        "container-max": "1120px",
+                        "element-gap": "16px",
+                        "margin-mobile": "20px",
+                        "unit": "8px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["\"Source Serif 4\""],
+                        "headline-lg-mobile": ["\"Source Serif 4\""],
+                        "headline-md": ["\"Source Serif 4\""],
+                        "display-lg": ["\"Source Serif 4\""],
+                        "body-lg": ["Work Sans"],
+                        "body-md": ["Work Sans"],
+                        "label-md": ["Work Sans"],
+                        "label-sm": ["Work Sans"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["32px", { "lineHeight": "40px", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["28px", { "lineHeight": "36px", "fontWeight": "600" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "500" }],
+                        "display-lg": ["42px", { "lineHeight": "52px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "500" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "letterSpacing": "0.03em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: theme('colors.background'); color: theme('colors.on-background'); }
+        .ghost-border { border: 1px solid theme('colors.surface-dim'); }
+        .soft-radius { border-radius: theme('borderRadius.xl'); }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="antialiased font-body-md text-body-md pb-24">
+<!-- Top Navigation (Mobile App Context) -->
+<nav class="sticky top-0 z-40 bg-background/90 backdrop-blur-sm border-b border-surface-dim">
+<div class="flex justify-between items-center h-16 px-margin-mobile">
+<button class="p-2 -ml-2 text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
+</button>
+<div class="font-label-md text-label-md text-on-surface-variant">Inventory Detail</div>
+<button class="p-2 -mr-2 text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="max-w-md mx-auto">
+<!-- Hero Image -->
+<div class="px-margin-mobile pt-4 pb-6">
+<div class="w-full h-80 rounded-xl overflow-hidden ghost-border relative bg-surface-container">
+<img class="w-full h-full object-cover" data-alt="A soft, high-quality photograph of an antique wooden Victorian writing desk. The desk is detailed with intricate carvings and small drawers, resting in a sunlit room with a warm cream and sage color palette. The lighting is calm and grounded, conveying a sense of heritage and quiet dignity. The setting feels like a cherished family home, avoiding any harsh or overly modern lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAqhDtOALIhEVNIUUnUGXgMfYeKXLVmAAYcZXzTfKKbzyzyuMIQkhqaJS9PMtEFR5aBDbp8AlHdAzrTK4VCDvnLd-Qxt_-syov4r8aqXn79OHNPK-s-2aCflyu-u4WNxEDfjYFniNobZfF8safudf90GEZ9tgHMiPs6oZ0iUwclk3WI9s89LmE3vr_FjHYysk-H7yBwRf7qUXujxvR3i8qp6RWWrGGUj4hV-EAJTKAL683mUsXXMdcC"/>
+</div>
+</div>
+<!-- Item Header & Details -->
+<section class="px-margin-mobile pb-section-gap border-b ghost-border border-x-0 border-t-0">
+<h1 class="font-headline-lg-mobile text-headline-lg-mobile text-on-background mb-4">Victorian Writing Desk</h1>
+<div class="flex flex-wrap gap-2 mb-6">
+<div class="px-3 py-1 bg-surface-container-high rounded-DEFAULT text-on-surface-variant font-label-sm text-label-sm ghost-border flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]" data-icon="category">category</span> Furniture
+                </div>
+<div class="px-3 py-1 bg-surface-container-high rounded-DEFAULT text-on-surface-variant font-label-sm text-label-sm ghost-border flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]" data-icon="history">history</span> Late 19th Century
+                </div>
+<div class="px-3 py-1 bg-surface-container-high rounded-DEFAULT text-on-surface-variant font-label-sm text-label-sm ghost-border flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]" data-icon="favorite">favorite</span> Well-loved
+                </div>
+</div>
+<div class="font-body-md text-body-md text-on-surface-variant mb-8 leading-relaxed">
+                A sturdy mahogany writing desk featuring five small drawers and a slightly worn leather top. It has been in the family study for over forty years, serving as the central hub for correspondence and quiet afternoon reading.
+            </div>
+<!-- Action Buttons -->
+<div class="flex flex-col gap-3">
+<button class="w-full py-4 px-6 bg-primary text-on-primary font-label-md text-label-md rounded-xl hover:bg-surface-tint transition-colors text-center shadow-sm">
+                    Claim this
+                </button>
+<button class="w-full py-4 px-6 bg-transparent text-secondary border border-secondary/30 font-label-md text-label-md rounded-xl hover:bg-secondary/5 transition-colors text-center">
+                    Ask a question
+                </button>
+</div>
+</section>
+<!-- Message Thread -->
+<section class="px-margin-mobile py-8">
+<h2 class="font-headline-md text-headline-md text-on-background mb-6 flex items-center gap-2">
+<span class="material-symbols-outlined" data-icon="forum">forum</span> Family Discussion
+            </h2>
+<div class="flex flex-col gap-6">
+<!-- Family Member Message -->
+<div class="flex gap-4">
+<div class="flex-shrink-0 w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center text-on-surface-variant font-label-md overflow-hidden ghost-border">
+<img class="w-full h-full object-cover" data-alt="A small, soft-focus profile portrait of an older woman with a kind expression. She is wearing a simple, classic sweater. The background is a muted, warm cream color. The lighting is gentle and natural, fitting a familial and grounded digital environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBxhgut7E7xlnuUXorVe8_eJ21nEVHs2QH4aAnFPCnbz_TR_G19NUBaRL0JZD96Y681qKVwtY2ktvxhBCSZ2ChF6S8OQKPCpnlWuY1Ps8PzFPSVVWtTv3BlP42qT0VS69_pmVLea038SXI7KCXUwuEWe3Jb7ODHRnQAlWZ0zpMSvie5o3mXplPp7NBvrzF1LRp2rli5YSJdwE9g9BFecPJR8TmC9Ndu25a_Okt5r9iPXiknHFEG_v3U"/>
+</div>
+<div class="flex-1">
+<div class="flex items-baseline gap-2 mb-1">
+<span class="font-label-md text-label-md text-on-background">Aunt Sarah</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant opacity-70">2 days ago</span>
+</div>
+<div class="p-4 bg-surface-container rounded-xl rounded-tl-none font-body-md text-body-md text-on-surface ghost-border">
+                            I remember Dad writing letters here every Sunday morning. He always kept his special fountain pen in the top right drawer.
+                        </div>
+</div>
+</div>
+<!-- Mediator Message -->
+<div class="flex gap-4">
+<div class="flex-shrink-0 w-10 h-10 rounded-full bg-secondary text-on-primary flex items-center justify-center">
+<span class="material-symbols-outlined text-[20px]" data-icon="handshake">handshake</span>
+</div>
+<div class="flex-1">
+<div class="flex items-baseline gap-2 mb-1">
+<span class="font-label-md text-label-md text-on-background">Steward Guide</span>
+</div>
+<div class="p-4 bg-secondary/10 rounded-xl rounded-tl-none font-body-md text-body-md text-on-surface border border-secondary/20">
+                            What a wonderful memory, Sarah. Would anyone else like to share a memory of this piece, or discuss how we might ensure it continues to be cherished in someone's home?
+                        </div>
+</div>
+</div>
+</div>
+<!-- Quick Reply Input -->
+<div class="mt-6 flex gap-3 items-center">
+<div class="flex-1 bg-surface-container rounded-full ghost-border flex items-center px-4 py-2">
+<input class="w-full bg-transparent border-none focus:ring-0 text-body-md text-on-background placeholder-on-surface-variant/50" placeholder="Share a thought..." type="text"/>
+</div>
+<button class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center text-primary ghost-border hover:bg-surface-dim transition-colors">
+<span class="material-symbols-outlined" data-icon="send">send</span>
+</button>
+</div>
+</section>
+</main>
+</body></html>

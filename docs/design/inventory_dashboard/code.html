@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Steward - Inventory</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,200..900;1,8..60,200..900&amp;family=Work+Sans:ital,wght@0,100..900;1,100..900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "tertiary-fixed-dim": "#d2c5b1",
+                      "on-primary": "#ffffff",
+                      "secondary": "#54634a",
+                      "tertiary-container": "#7e7362",
+                      "on-surface-variant": "#54433e",
+                      "on-primary-fixed-variant": "#74341e",
+                      "surface-container-lowest": "#ffffff",
+                      "surface-container-highest": "#ebe1da",
+                      "on-secondary-fixed-variant": "#3d4b34",
+                      "on-background": "#1f1b17",
+                      "surface": "#fff8f4",
+                      "inverse-primary": "#ffb59d",
+                      "error": "#ba1a1a",
+                      "surface-tint": "#914b33",
+                      "on-secondary": "#ffffff",
+                      "outline": "#87736d",
+                      "on-error-container": "#93000a",
+                      "on-error": "#ffffff",
+                      "primary": "#8e4831",
+                      "outline-variant": "#d9c1ba",
+                      "on-tertiary-fixed-variant": "#4e4637",
+                      "primary-fixed-dim": "#ffb59d",
+                      "surface-container-low": "#fcf2ea",
+                      "tertiary": "#645b4b",
+                      "secondary-container": "#d7e8c8",
+                      "surface-container": "#f6ece5",
+                      "on-secondary-fixed": "#121f0b",
+                      "error-container": "#ffdad6",
+                      "surface-variant": "#ebe1da",
+                      "on-secondary-container": "#5a6950",
+                      "inverse-surface": "#352f2b",
+                      "surface-bright": "#fff8f4",
+                      "surface-dim": "#e2d8d1",
+                      "primary-container": "#ac6046",
+                      "primary-fixed": "#ffdbd0",
+                      "surface-container-high": "#f1e6df",
+                      "on-primary-fixed": "#390b00",
+                      "secondary-fixed-dim": "#bbccad",
+                      "on-tertiary-fixed": "#211b0e",
+                      "on-primary-container": "#fffbff",
+                      "background": "#fff8f4",
+                      "secondary-fixed": "#d7e8c8",
+                      "on-tertiary": "#ffffff",
+                      "on-tertiary-container": "#fffbff",
+                      "inverse-on-surface": "#f9efe8",
+                      "on-surface": "#1f1b17",
+                      "tertiary-fixed": "#efe1cc"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "gutter": "24px",
+                      "section-gap": "64px",
+                      "container-max": "1120px",
+                      "element-gap": "16px",
+                      "margin-mobile": "20px",
+                      "unit": "8px"
+              },
+              "fontFamily": {
+                      "headline-lg": [
+                              "\"Source Serif 4\""
+                      ],
+                      "headline-lg-mobile": [
+                              "\"Source Serif 4\""
+                      ],
+                      "headline-md": [
+                              "\"Source Serif 4\""
+                      ],
+                      "display-lg": [
+                              "\"Source Serif 4\""
+                      ],
+                      "body-lg": [
+                              "Work Sans"
+                      ],
+                      "body-md": [
+                              "Work Sans"
+                      ],
+                      "label-md": [
+                              "Work Sans"
+                      ],
+                      "label-sm": [
+                              "Work Sans"
+                      ]
+              },
+              "fontSize": {
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "28px",
+                              {
+                                      "lineHeight": "36px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "display-lg": [
+                              "42px",
+                              {
+                                      "lineHeight": "52px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "label-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "letterSpacing": "0.01em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "label-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.03em",
+                                      "fontWeight": "600"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+<style>
+        .ghost-border {
+            border: 1px solid rgba(135, 115, 109, 0.15); /* outline color at 15% */
+        }
+      </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background antialiased min-h-screen flex flex-col pb-24">
+<!-- TopAppBar -->
+<header class="w-full top-0 sticky bg-background z-40 flat no shadows">
+<div class="flex justify-between items-center h-16 px-gutter max-w-container-max mx-auto">
+<button aria-label="Menu" class="text-on-surface-variant hover:bg-secondary-container/10 transition-colors rounded-full p-2">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<h1 class="font-headline-md text-headline-md text-primary tracking-tight">Steward</h1>
+<button aria-label="User profile" class="hover:bg-secondary-container/10 transition-colors rounded-full overflow-hidden w-8 h-8 flex items-center justify-center ghost-border">
+<img alt="User Avatar" class="w-full h-full object-cover" data-alt="A small, soft-focus profile picture of an older woman with silver hair, wearing a neutral-toned linen blouse. Warm, natural window light. Plainspoken, respectful aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBdeLL_2Nkp87H1sWhp8LNi-U2jBc99yZktP5y4wlsIrOKMJxkhMbajzjbMvgg6KOQabTvu7BL_fMwrh6I5way9B3KYd_8yt20e16Sh84HJwd1-WR7imQWekjax93e3iuMxkfLNu_Z510e9aAsRKz8oaG_9jvu7gd24GRgtKD9ddPQ2qyKaA-1gX20dx4-0_1-j5oxi0ab3ReFPaw6cMbluPHma9tUZOw84VbSTMcqlKQCqPKfK9sAj"/>
+</button>
+</div>
+</header>
+<!-- Main Content -->
+<main class="flex-grow px-margin-mobile md:px-gutter max-w-container-max mx-auto w-full pt-4 pb-section-gap flex flex-col gap-unit">
+<header class="mb-6 mt-2">
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile text-on-background mb-4">Inventory</h2>
+<!-- Filter Chips -->
+<div class="flex overflow-x-auto pb-2 -mx-margin-mobile px-margin-mobile md:mx-0 md:px-0 gap-unit hide-scrollbar whitespace-nowrap">
+<button class="bg-secondary-container/30 text-on-secondary-container font-label-md text-label-md px-4 py-2 rounded-lg border border-secondary-container transition-colors">All Items</button>
+<button class="bg-surface-container-highest text-on-surface-variant font-label-md text-label-md px-4 py-2 rounded-lg ghost-border hover:bg-surface-variant transition-colors">Unclaimed</button>
+<button class="bg-surface-container-highest text-on-surface-variant font-label-md text-label-md px-4 py-2 rounded-lg ghost-border hover:bg-surface-variant transition-colors">Claimed</button>
+<button class="bg-surface-container-highest text-on-surface-variant font-label-md text-label-md px-4 py-2 rounded-lg ghost-border hover:bg-surface-variant transition-colors">Contested</button>
+</div>
+</header>
+<!-- Bento Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-element-gap">
+<!-- Item Card 1 -->
+<article class="bg-surface-container-lowest rounded-lg ghost-border overflow-hidden flex flex-col hover:bg-secondary-container/5 transition-colors group">
+<div class="w-full h-48 relative">
+<img alt="Oak Desk" class="w-full h-full object-cover" data-alt="A beautifully carved antique oak desk in a naturally lit, empty room with cream walls. The lighting is soft and diffuse, highlighting the wood grain. Photographed with a sense of reverence and stillness." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDxyoaYfb4f-qt8tm3nbzE9t39qZLWDrCboNVCfPQqIH7Qbm09bk5zOwnktm4ZoonWU7cI2dzlPD8OMOGTJ24YsWMOLe4NqXYl8Wg6dJ0ZPEb_g_vo7g38tsnZ1tB_dF16xIVuceuqcn5TKbegfUnjr_hublVbd_8bB4wlzNb5tZZMg1q9R0PVOYARgxfZl11J7Hxg12fFkw1T5UAwt2XLak0myHVYizTJdKIKRP8XERokHcUSsvslk"/>
+<div class="absolute top-2 right-2 bg-surface-container/90 text-on-surface-variant font-label-sm text-label-sm px-2 py-1 rounded backdrop-blur-sm">
+                        Unclaimed
+                    </div>
+</div>
+<div class="p-4 flex flex-col gap-2">
+<span class="font-label-sm text-label-sm text-tertiary uppercase tracking-wider">Furniture</span>
+<h3 class="font-headline-md text-headline-md text-on-surface">Antique Oak Desk</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1 line-clamp-2">Grandfather's writing desk, brought over in 1920. Needs minor restoration on the left drawer.</p>
+</div>
+</article>
+<!-- Item Card 2 -->
+<article class="bg-surface-container-lowest rounded-lg ghost-border overflow-hidden flex flex-col hover:bg-secondary-container/5 transition-colors group">
+<div class="w-full h-48 relative">
+<img alt="Silver Tea Set" class="w-full h-full object-cover" data-alt="A tarnished but elegant silver tea set arranged neatly on a plain wooden table against a warm cream backdrop. Soft, melancholy natural light casts gentle shadows, emphasizing a quiet, archival aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA_Bj1RBVDNO1i1UDXbBkYvHSHIHI2huQ3nuEdvyConMRbBZkTyMm7Yb577tkKv-i8VqesLe4buJlZbDZSeV4MOVgeYl08SYqF5RXdiL3ExP3fVEnlf9f8AcbZ1-OvV4vivHV6MII0HciiZ0EBf15wOox2RhXmWKsB--os-nQB_8FCIJsTLT0a2Hysh0Zw2I0AtGgYLDhtR2zvxq4VZC5wVCOnYKUcK3PChQJLpyBznfXVigmBxaYPC"/>
+<div class="absolute top-2 right-2 bg-secondary-container/90 text-on-secondary-container font-label-sm text-label-sm px-2 py-1 rounded backdrop-blur-sm">
+                        Claimed (Sarah)
+                    </div>
+</div>
+<div class="p-4 flex flex-col gap-2">
+<span class="font-label-sm text-label-sm text-tertiary uppercase tracking-wider">Silverware</span>
+<h3 class="font-headline-md text-headline-md text-on-surface">Silver Tea Set</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1 line-clamp-2">Complete set. Mostly used for special occasions during the holidays.</p>
+</div>
+</article>
+<!-- Item Card 3 -->
+<article class="bg-surface-container-lowest rounded-lg ghost-border overflow-hidden flex flex-col hover:bg-secondary-container/5 transition-colors group">
+<div class="w-full h-48 relative">
+<img alt="Floral Armchair" class="w-full h-full object-cover" data-alt="A comfortable, worn, floral-patterned wingback armchair sitting alone in a spacious room. The colors are muted greens and creams. Gentle afternoon light. Atmosphere is nostalgic and calm." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCC0HQlNQSKuYzft_ljSbsyDgzr0_CXuxS75qE4DQn_NtiI65bSYoCMR-SrjK4dxmxPUzWJyM26SXifI2ObXFDwM18Hwab0osYCkO_npTV4ZSeJXYK_CXkDugfeUADK2U_WKZ0e6glJy_Vzs-zKVXAdCZghkXVtKm1TTSfOONxolqlQBXGCNzVmzrLE8O-50ImhtOl5HWcNqCcKYgUKqYqPsutEorNU5EapWhqpRS7Zu30l00W-mkbQ"/>
+<div class="absolute top-2 right-2 bg-surface-container-highest/90 text-on-surface-variant font-label-sm text-label-sm px-2 py-1 rounded backdrop-blur-sm ghost-border">
+                        Contested
+                    </div>
+</div>
+<div class="p-4 flex flex-col gap-2">
+<span class="font-label-sm text-label-sm text-tertiary uppercase tracking-wider">Furniture</span>
+<h3 class="font-headline-md text-headline-md text-on-surface">Floral Wingback Chair</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1 line-clamp-2">Mom's reading chair. Both David and Emily have expressed interest.</p>
+</div>
+</article>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center h-16 pb-safe px-4 bg-surface-container z-50 md:hidden">
+<button aria-label="Inventory" class="flex flex-col items-center justify-center text-primary bg-secondary-container/30 rounded-full py-1 px-4 scale-95 transition-transform duration-150">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">grid_view</span>
+<span class="font-label-sm text-label-sm mt-1">Inventory</span>
+</button>
+<button aria-label="Messages" class="flex flex-col items-center justify-center text-on-surface-variant py-1 px-4 hover:text-primary transition-all opacity-80 hover:opacity-100">
+<span class="material-symbols-outlined">chat_bubble</span>
+<span class="font-label-sm text-label-sm mt-1">Messages</span>
+</button>
+<button aria-label="Family" class="flex flex-col items-center justify-center text-on-surface-variant py-1 px-4 hover:text-primary transition-all opacity-80 hover:opacity-100">
+<span class="material-symbols-outlined">group</span>
+<span class="font-label-sm text-label-sm mt-1">Family</span>
+</button>
+</nav>
+<style>
+        /* Hide scrollbar for horizontal scroll areas */
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</body></html>

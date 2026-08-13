@@ -1,18 +1,208 @@
-rules_version='2'
+rules_version = '2';
+
+// Steward — Firestore Security Rules
+//
+// These mirror the access model backend/membership.py already enforces with
+// require_role(). Today every write goes through the backend on the Admin SDK,
+// which bypasses rules entirely — so nothing here is load-bearing yet. They are
+// written for the moment frontend code talks to Firestore directly, which is
+// exactly the trust boundary CLAUDE.md's two-service split exists to hold.
+//
+// Default is deny. A collection with no match block below is unreachable from a
+// client, and that is deliberate — a new collection should have to opt in.
+//
+// Membership document ids are deterministic ({estate_id}__{user_id}), so every
+// role check is a single get() rather than a query. Claims, resolutions, and
+// dispositions carry no estate_id, so their rules resolve the estate through the
+// item — one extra get(), well inside the 10-per-request limit.
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // --- helpers ---------------------------------------------------------
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function membershipPath(estateId) {
+      return /databases/$(database)/documents/estate_memberships/$(estateId + '__' + request.auth.uid);
+    }
+
+    function hasMembership(estateId) {
+      return signedIn() && exists(membershipPath(estateId));
+    }
+
+    // An accepted member. A pending invite (accepted_at null) grants nothing —
+    // the same rule get_role() applies in membership.py.
+    function isMember(estateId) {
+      return hasMembership(estateId)
+          && get(membershipPath(estateId)).data.accepted_at != null;
+    }
+
+    function isExecutor(estateId) {
+      return isMember(estateId)
+          && get(membershipPath(estateId)).data.role == 'executor';
+    }
+
+    function isBeneficiary(estateId) {
+      return isMember(estateId)
+          && get(membershipPath(estateId)).data.role == 'beneficiary';
+    }
+
+    function itemExists(itemId) {
+      return exists(/databases/$(database)/documents/items/$(itemId));
+    }
+
+    // The estate an item belongs to — claims, resolutions, and dispositions all
+    // reach their estate this way.
+    function itemEstate(itemId) {
+      return get(/databases/$(database)/documents/items/$(itemId)).data.estate_id;
+    }
+
+    function isMemberOfItemEstate(itemId) {
+      return itemExists(itemId) && isMember(itemEstate(itemId));
+    }
+
+    function isExecutorOfItemEstate(itemId) {
+      return itemExists(itemId) && isExecutor(itemEstate(itemId));
+    }
+
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    // --- users -----------------------------------------------------------
+    //
+    // Your own profile only. Other members' display names reach the UI through
+    // the backend API rather than a direct read, so an authenticated stranger
+    // can't enumerate the estate's email addresses. If the frontend ever needs
+    // to render names client-side, widen this deliberately.
+
+    match /users/{userId} {
+      allow read: if signedIn() && request.auth.uid == userId;
+      allow write: if false;      // backend only
+    }
+
+    // --- estates ---------------------------------------------------------
+
+    match /estates/{estateId} {
+      allow read: if isMember(estateId);
+      // Creating an estate is backend-only by construction: the executor's
+      // membership can't exist before the estate does.
+      allow create: if false;
+      allow update: if isExecutor(estateId);
+      allow delete: if false;
+    }
+
+    // --- estate memberships ----------------------------------------------
+
+    match /estate_memberships/{membershipId} {
+      // You can always see your own row, pending or accepted — an invitee has to
+      // be able to discover the invite. Accepted members can see the roster.
+      allow read: if signedIn()
+                  && (resource.data.user_id == request.auth.uid
+                      || isMember(resource.data.estate_id));
+
+      // Inviting is the executor's alone.
+      allow create: if isExecutor(request.resource.data.estate_id);
+      allow update: if isExecutor(resource.data.estate_id)
+                    && request.resource.data.estate_id == resource.data.estate_id
+                    && request.resource.data.user_id == resource.data.user_id;
+      allow delete: if false;
+    }
+
+    // --- items -----------------------------------------------------------
+
+    match /items/{itemId} {
+      allow read: if isMember(resource.data.estate_id);
+
+      // Classification is the backend's job. A client never creates an item, and
+      // never touches the ai_* fields or suggested_disposition — those come from
+      // Gemini and from the estate's OverrideLog history, not from a person.
+      allow create: if false;
+
+      // Status is the one field the app's own flows move (claim -> claimed /
+      // contested, resolve -> resolved). hasOnly() is what keeps a status update
+      // from smuggling an ai_category edit alongside it.
+      allow update: if isMember(resource.data.estate_id)
+                    && changedKeys().hasOnly(['status'])
+                    && request.resource.data.status in [
+                         'unclaimed', 'claimed', 'contested',
+                         'resolved', 'routed', 'needs_clarification'
+                       ];
+
+      allow delete: if false;
+    }
+
+    // --- claims ----------------------------------------------------------
+
+    match /claims/{claimId} {
+      allow read: if isMemberOfItemEstate(resource.data.item_id);
+
+      // A beneficiary claims for themselves. The executor doesn't claim — they
+      // decide — and nobody claims on someone else's behalf.
+      allow create: if itemExists(request.resource.data.item_id)
+                    && isBeneficiary(itemEstate(request.resource.data.item_id))
+                    && request.resource.data.user_id == request.auth.uid;
+
+      // A claim is a record of what someone said, not a draft.
+      allow update: if false;
+      // You may withdraw your own claim. You may not withdraw anyone else's —
+      // deleting a rival claim would silently un-contest an item.
+      allow delete: if signedIn() && resource.data.user_id == request.auth.uid;
+    }
+
+    // --- messages --------------------------------------------------------
+    //
+    // One unified feed, append-only. item_id is nullable by design.
+
+    match /messages/{messageId} {
+      allow read: if isMember(resource.data.estate_id);
+
+      // user_id must be you: without this, a client could post as the agent
+      // (`steward-agent`) and put words in Steward's mouth.
+      allow create: if isMember(request.resource.data.estate_id)
+                    && request.resource.data.user_id == request.auth.uid;
+
+      allow update, delete: if false;
+    }
+
+    // --- resolutions -----------------------------------------------------
+
+    match /resolutions/{resolutionId} {
+      allow read: if isMemberOfItemEstate(resource.data.item_id);
+      allow create: if isExecutorOfItemEstate(request.resource.data.item_id)
+                    && request.resource.data.resolved_by_user_id == request.auth.uid;
+      allow update: if isExecutorOfItemEstate(resource.data.item_id);
+      allow delete: if false;
+    }
+
+    // --- dispositions ----------------------------------------------------
+
+    match /dispositions/{dispositionId} {
+      allow read: if isMemberOfItemEstate(resource.data.item_id);
+      allow create: if isExecutorOfItemEstate(request.resource.data.item_id);
+      allow update: if isExecutorOfItemEstate(resource.data.item_id);
+      allow delete: if false;
+    }
+
+    // --- override logs ---------------------------------------------------
+    //
+    // The estate's learned history. Members can see what the agent is learning
+    // from; only the executor's decisions write to it.
+
+    match /override_logs/{logId} {
+      allow read: if isMember(resource.data.estate_id);
+      allow create: if isExecutor(request.resource.data.estate_id);
+      allow update: if isExecutor(resource.data.estate_id);
+      allow delete: if false;
+    }
+
+    // --- everything else --------------------------------------------------
+
     match /{document=**} {
-      // This rule allows anyone with your database reference to view, edit,
-      // and delete all data in your database. It is useful for getting
-      // started, but it is configured to expire after 30 days because it
-      // leaves your app open to attackers. At that time, all client
-      // requests to your database will be denied.
-      //
-      // Make sure to write security rules for your app before that time, or
-      // else all client requests to your database will be denied until you
-      // update your rules.
-      allow read, write: if request.time < timestamp.date(2026, 9, 10);
+      allow read, write: if false;
     }
   }
 }
