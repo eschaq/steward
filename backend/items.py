@@ -7,6 +7,8 @@ exactly those fields and nothing more.
 from enum import Enum
 from typing import Optional
 
+from google.cloud.firestore_v1.base_query import FieldFilter
+
 from classify import Classification, classify_image
 from firebase_app import get_db
 from messages import post_clarifying_question
@@ -51,6 +53,31 @@ def suggestion_for(
         ai_classification_confidence=classification.ai_classification_confidence,
         identified=not classification.needs_clarification,
     )
+
+
+def get_item(item_id: str) -> Optional[Item]:
+    """One item, or None if there is no such document."""
+    snapshot = get_db().collection(Item.COLLECTION).document(item_id).get()
+    if not snapshot.exists:
+        return None
+    return Item.model_validate(snapshot.to_dict())
+
+
+def list_items_for_estate(estate_id: str) -> list[Item]:
+    """Every item in an estate, newest first — what the dashboard renders.
+
+    Single-field equality filter, so Firestore's automatic index covers it.
+    Ordering is done here rather than in the query for the same reason: an
+    order_by on a second field would want a composite index.
+    """
+    snapshots = (
+        get_db()
+        .collection(Item.COLLECTION)
+        .where(filter=FieldFilter("estate_id", "==", estate_id))
+        .get()
+    )
+    items = [Item.model_validate(s.to_dict()) for s in snapshots]
+    return sorted(items, key=lambda i: i.created_at, reverse=True)
 
 
 def recompute_suggestion(item_id: str) -> DispositionSuggestion:

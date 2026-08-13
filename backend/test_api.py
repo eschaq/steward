@@ -27,6 +27,7 @@ from fastapi.testclient import TestClient
 
 from api import app
 from claims import claimant_ids_for_item, record_claim
+from dev_tokens import bearer
 from firebase_app import PROJECT_ID, get_db
 from init_firestore import to_firestore
 from membership import accept_invite, create_auth_user, invite_to_estate
@@ -44,6 +45,9 @@ CLARIFY_CATEGORY = "unknown"
 CLARIFY_NOTES = "A solid grey-blue field; nothing identifiable in frame."
 
 client = TestClient(app)
+
+# The agent route sits behind auth now: a verified accepted member of the estate.
+AUTH: dict[str, str] = {}
 
 
 def write_item(item_id: str, category: str, notes: str, status: ItemStatus) -> Item:
@@ -85,7 +89,7 @@ def check_posts_once(
     failures: list[str], item_id: str, expected_text: str, repeat_status: str
 ) -> None:
     """POST once, then again: same message, written once, content unchanged."""
-    first = client.post(f"/items/{item_id}/agent-message")
+    first = client.post(f"/items/{item_id}/agent-message", headers=AUTH)
     check(failures, "first POST", first.status_code, 200)
     if first.status_code != 200:
         print(f"           body: {first.text}")
@@ -105,7 +109,7 @@ def check_posts_once(
     check(failures, "text identical to messages.py", message.text, expected_text)
 
     created_at = message.created_at
-    second = client.post(f"/items/{item_id}/agent-message")
+    second = client.post(f"/items/{item_id}/agent-message", headers=AUTH)
     check(failures, "second POST", second.status_code, 200)
     check(failures, "second status", second.json()["status"], repeat_status)
     after = get_messages_for_item(item_id)
@@ -123,6 +127,8 @@ def main() -> int:
     print("setup")
     health = client.get("/healthz")
     check(failures, "healthz", health.status_code, 200)
+
+    AUTH.update(bearer(BENEFICIARIES[0][0], BENEFICIARIES[0][1]))
 
     uids = []
     for email, name in BENEFICIARIES:
@@ -148,7 +154,7 @@ def main() -> int:
     # --- (a) the clarifying question ---------------------------------------
     print(f"(a) POST /items/{CLARIFY_ITEM}/agent-message  (needs_clarification)")
     expected = clarifying_question_text(CLARIFY_CATEGORY, CLARIFY_NOTES)
-    first = client.post(f"/items/{CLARIFY_ITEM}/agent-message")
+    first = client.post(f"/items/{CLARIFY_ITEM}/agent-message", headers=AUTH)
     if first.status_code == 200:
         check(failures, "behavior", first.json()["behavior"], "ask_about_unclear_item")
         check(failures, "item_status", first.json()["item_status"], "needs_clarification")
@@ -162,7 +168,7 @@ def main() -> int:
     print(f"(b) POST /items/{CONTESTED_ITEM}/agent-message  (contested)")
     names = [display_name(uid) for uid in claimant_ids_for_item(CONTESTED_ITEM)]
     print(f"           claimants: {', '.join(names)}")
-    first = client.post(f"/items/{CONTESTED_ITEM}/agent-message")
+    first = client.post(f"/items/{CONTESTED_ITEM}/agent-message", headers=AUTH)
     if first.status_code == 200:
         check(failures, "behavior", first.json()["behavior"], "mediate_contested_item")
         check(failures, "item_status", first.json()["item_status"], "contested")
@@ -173,12 +179,12 @@ def main() -> int:
 
     # --- (c) states with nothing to say ------------------------------------
     print("(c) items the agent has nothing to say about")
-    ineligible = client.post(f"/items/{INELIGIBLE_ITEM}/agent-message")
+    ineligible = client.post(f"/items/{INELIGIBLE_ITEM}/agent-message", headers=AUTH)
     check(failures, "unclaimed item", ineligible.status_code, 409)
     print(f"           {ineligible.json().get('detail')}")
     check(failures, "no message written", len(get_messages_for_item(INELIGIBLE_ITEM)), 0)
 
-    missing = client.post(f"/items/{MISSING_ITEM}/agent-message")
+    missing = client.post(f"/items/{MISSING_ITEM}/agent-message", headers=AUTH)
     check(failures, "unknown item", missing.status_code, 404)
     print(f"           {missing.json().get('detail')}")
     print()

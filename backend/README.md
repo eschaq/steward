@@ -3,19 +3,22 @@
 Tier 1 Pydantic models, Firestore initialization, estate membership (Auth users,
 invites, role checks), claims, resolutions, dispositions, the adaptive suggestion
 loop, and the Message Center with its two agent behaviors — the last wrapped as
-Google ADK tools behind a minimal FastAPI app.
+Google ADK tools. All of it sits behind a FastAPI app with Firebase ID token
+authentication, which is what Cloud Run serves.
 
 | File                 | Purpose                                                        |
 | -------------------- | -------------------------------------------------------------- |
 | `models.py`          | Pydantic models for Estate, User, EstateMembership, Message, Claim, Item |
 | `firebase_app.py`    | Initializes the Admin SDK once per process; `get_db()`          |
 | `membership.py`      | Create Auth user, invite to estate, accept invite, role check   |
-| `classify.py`        | Photo → the four `ai_*` Item fields, via the Gemini API         |
+| `classify.py`        | Photo → the four `ai_*` Item fields, via Vertex AI              |
 | `items.py`           | Writes a classified photo out as an Item document               |
 | `claims.py`          | Record a claim; re-derive item status from its claims           |
 | `messages.py`        | The feed, the agent User, and the agent's two behaviors         |
 | `agent.py`           | ADK tools wrapping the two agent behaviors; the `LlmAgent`       |
-| `api.py`             | FastAPI app — one route, what Cloud Run will serve               |
+| `auth_deps.py`       | Verifies the Firebase ID token; `CallerUid` dependency           |
+| `dev_tokens.py`      | Real ID tokens for the test scripts (test accounts only)         |
+| `api.py`             | FastAPI app — the routes Cloud Run serves                        |
 | `resolutions.py`     | Executor resolves a claimed/contested item; flips to `resolved` |
 | `overrides.py`       | OverrideLog + the adaptive suggestion loop                       |
 | `dispositions.py`    | Executor's final call: writes the Disposition row + OverrideLog  |
@@ -29,7 +32,8 @@ Google ADK tools behind a minimal FastAPI app.
 | `test_dispositions.py`| Script: a decision writes both docs; uncertain/unresolved refused |
 | `test_recompute.py`  | Script: a stale suggestion catches up; a resolved one is left alone |
 | `test_api.py`        | Script: both behaviors over HTTP via ADK, byte-identical copy    |
-| `requirements.txt`   | `firebase-admin`, `pydantic`, `google-generativeai`, …          |
+| `test_endpoints.py`  | Script: every endpoint, valid vs unauthorized actor              |
+| `requirements.txt`   | `firebase-admin`, `pydantic`, `google-adk`, `google-genai`, …   |
 
 ## Membership
 
@@ -104,29 +108,17 @@ Three reasons, in order of weight:
    `gemini-3.5-flash` quirk (an occasional stray `}`). Routing it through an
    `LlmAgent` replaces that with ADK's own response handling and loses the
    tolerance.
-3. **The right change is a migration, not a wrap.** `google-adk` brings in
-   `google-genai`, the SDK that replaces the deprecated `google-generativeai`
-   this module still uses. Moving `classify.py` onto `google-genai` is now
-   unblocked and is the natural next step — but that's a rewrite of verified
-   code, so it wants its own loop.
+3. **The right change was a migration, not a wrap.** `google-adk` brought in
+   `google-genai`, and `classify.py` has since moved onto it and onto Vertex AI —
+   a transport change, done separately, rather than folding classification into
+   an agent turn.
 
-### The API
+### The agent route
 
-```
-GET  /healthz
-POST /items/{item_id}/agent-message
-```
-
-One route, deliberately. No auth middleware and no other routes — both are later
-work, and the frontend service will reach Firestore only through here (CLAUDE.md's
-trust boundary). 404 if the item doesn't exist, **409** if it is in a state no
-behavior attaches to; a 200 that quietly did nothing would be the failure mode
-the RDD rules out. Calling twice is safe — the second call reports
-`already_asked` / `already_mediated`.
-
-```bash
-.venv/bin/uvicorn api:app --reload      # local
-```
+`POST /items/{item_id}/agent-message` — see the API section below. 409 if the
+item is in a state no behavior attaches to; a 200 that quietly did nothing would
+be the failure mode the RDD rules out. Calling twice is safe — the second call
+reports `already_asked` / `already_mediated`.
 
 Verified run against real Firestore (`test_api.py`, driven with FastAPI's
 `TestClient` — no live server):
@@ -143,6 +135,88 @@ Verified run against real Firestore (`test_api.py`, driven with FastAPI's
 
 The equality assertions compare against `messages.py`'s own copy functions, so
 "the ADK path writes what the direct path wrote" is checked rather than assumed.
+
+## The API
+
+```bash
+.venv/bin/uvicorn api:app --reload      # local
+```
+
+| Route                                | Who                        | Wraps                          |
+| ------------------------------------ | -------------------------- | ------------------------------ |
+| `GET  /healthz`                       | anyone (no token)          | —                              |
+| `POST /estates/{id}/invite`           | executor                   | `invite_to_estate`             |
+| `POST /estates/{id}/accept`           | the invitee themselves     | `accept_invite`                |
+| `GET  /estates/{id}/items`            | any accepted member        | `list_items_for_estate`        |
+| `POST /items/{id}/claim`              | any accepted member        | `record_claim`                 |
+| `POST /items/{id}/resolve`            | executor                   | `resolve_item`                 |
+| `POST /items/{id}/disposition`        | executor                   | `record_disposition_decision`  |
+| `POST /items/{id}/agent-message`      | any accepted member        | `run_behavior_for_item`        |
+
+### Authentication
+
+`auth_deps.current_uid` verifies the `Authorization: Bearer <Firebase ID token>`
+header with the Admin SDK and returns the uid. Because the Firebase Auth uid *is*
+the `User.id`, that uid goes straight into `require_role` with no lookup.
+
+Handlers annotate `uid: CallerUid` — there is no user id in any request body, so
+a caller can only ever act as themselves. `verify_id_token` runs with
+`clock_skew_seconds=30`: a second of drift between this host and Google's clock
+is ordinary and shouldn't read as a forged token.
+
+### Authorization is not in the route layer
+
+Routes do three things: establish who is calling, hand off, and translate
+exceptions into status codes. The rules stay in `require_role` (membership.py)
+and in the state gates inside resolutions.py and dispositions.py — already
+verified against real Firestore. A route that re-decided those questions would be
+a second copy free to drift from the first.
+
+| Status | Meaning                                        | Source                    |
+| ------ | ---------------------------------------------- | ------------------------- |
+| 401    | no token, or one that doesn't verify           | `auth_deps`               |
+| 403    | authenticated, but not allowed                 | `MembershipError`         |
+| 404    | no such item, or no invite to accept           | route-level lookup        |
+| 409    | allowed, but not in a state for it             | `Claim`/`Resolution`/`DispositionError` |
+
+`POST /estates/{id}/accept` deliberately does **not** call `require_role`: a
+pending invitee has no role yet — that is precisely what they are accepting. They
+can only accept their own invite, since the uid comes from the verified token.
+`firestore.rules` lets only the executor write a membership row, so this endpoint
+is the path an invitee has to take.
+
+Verified run against real Firestore (`test_endpoints.py`), with **real ID
+tokens** minted by signing test users in against Identity Toolkit — nothing about
+auth is stubbed:
+
+```
+no token / garbage token / wrong scheme      -> 401
+beneficiary or stranger invites              -> 403, no membership written
+executor invites                             -> 200, membership pending
+stranger accepts                             -> 404, nothing written
+invitee accepts their own                    -> 200, accepted_at set
+stranger lists items                         -> 403
+stranger claims                              -> 403, no claim, item untouched
+beneficiary resolves                         -> 403, no resolution, item untouched
+executor resolves an unclaimed item          -> 409, nothing written
+beneficiary decides a disposition            -> 403, neither document written
+executor decides on an unresolved item       -> 409, neither document written
+'uncertain' as a decision                    -> 409, nothing written
+```
+
+Each refusal asserts the collections are **untouched**, not just that a status
+code came back — a 403 that had already written its document would pass a
+status-only test and still be a hole.
+
+### Test tokens
+
+`dev_tokens.py` mints real ID tokens by signing a test user in with
+email/password. `auth.create_custom_token` would be tidier, but it needs a
+service account to sign with and this machine authenticates as a user.
+
+It sets the account's password to do that, so it **refuses any address outside
+`@example.com`**. The browser API key comes from `STEWARD_WEB_API_KEY` or, absent
+that, from `gcloud services api-keys` — it is not committed.
 
 ## Dispositions
 
@@ -606,9 +680,10 @@ gcloud auth application-default set-quota-project steward-hackathon-505217
 .venv/bin/python test_dispositions.py
 .venv/bin/python test_recompute.py
 .venv/bin/python test_api.py
+.venv/bin/python test_endpoints.py
 ```
 
-All nine pass against Vertex AI and real Firestore. `test_classify`,
+All ten pass against Vertex AI and real Firestore. `test_classify`,
 `test_overrides`, and `test_recompute` make live Gemini calls; the other six make
 none.
 
