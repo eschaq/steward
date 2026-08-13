@@ -1,66 +1,76 @@
-/* Steward's design system, from docs/design/steward/DESIGN.md.
+/* Steward — "Hearth & Archive"
  *
- * Written as plain CSS with custom properties rather than Tailwind: the tokens
- * are already fully specified there, and a stylesheet keeps them in one readable
- * place without a build-time config to drift from the source of truth.
+ * The palette and type pairing are still docs/design/steward/DESIGN.md's
+ * (Source Serif 4 + Work Sans, clay / sage / cream). The *shape* of the thing
+ * comes from the Claude Design redesign — "Steward Redesign.dc.html":
  *
- * The brand rules out a lot on purpose (CLAUDE.md): no urgency, no countdowns,
- * no gamification, no shadows. Depth is tonal layering and ghost borders only.
+ *   - a dark editorial surface (#211a14) with type set large over it
+ *   - big tonal stat blocks that read as a ledger, not a score
+ *   - archival tag chips: rectangular, 3px, uppercase, letterspaced
+ *   - generous container radii (12–22px) and pill-shaped actions
+ *   - no shadows anywhere; depth is tonal layering and hairlines
+ *
+ * Three of those diverge from DESIGN.md as written — see the frontend README.
+ * DESIGN.md hasn't been changed yet; that's a separate, approved step.
  */
 
 :root {
-  /* Surfaces — warm cream, never stark white for the page itself. */
+  /* --- the dark surface (hero, sign-in) --- */
+  --ink: #211a14;
+  --ink-deep: #17110c;
+  --on-ink: #f9efe8;
+  --on-ink-muted: rgba(249, 239, 232, 0.62);
+  --on-ink-faint: rgba(249, 239, 232, 0.42);
+  --ink-hairline: rgba(249, 239, 232, 0.16);
+  --ink-accent: #ffb59d;
+
+  /* --- the light surface --- */
   --surface: #fff8f4;
-  --surface-container-lowest: #ffffff;
-  --surface-container-low: #fcf2ea;
-  --surface-container: #f6ece5;
-  --surface-container-high: #f1e6df;
-  --surface-container-highest: #ebe1da;
+  --surface-lowest: #ffffff;
+  --surface-low: #fcf2ea;
+  --surface-mid: #f6ece5;
+  --surface-high: #f1e6df;
+  --surface-highest: #ebe1da;
 
   --on-surface: #1f1b17;
   --on-surface-variant: #54433e;
   --outline: #87736d;
   --outline-variant: #d9c1ba;
+  --hairline: rgba(135, 115, 109, 0.18);
 
-  /* Warm clay. */
+  /* --- clay --- */
   --primary: #8e4831;
+  --primary-hover: #74341e;
+  --primary-block: #ac6046;
   --on-primary: #ffffff;
-  --primary-container: #ac6046;
-  --primary-fixed: #ffdbd0;
-  --on-primary-fixed-variant: #74341e;
+  --clay-tint: #ffdbd0;
+  --on-clay-tint: #74341e;
 
-  /* Soft sage. */
-  --secondary: #54634a;
-  --secondary-container: #d7e8c8;
-  --on-secondary-container: #5a6950;
-  --secondary-fixed-dim: #bbccad;
-  --on-secondary-fixed-variant: #3d4b34;
+  /* --- sage --- */
+  --sage: #d7e8c8;
+  --on-sage: #2c3a24;
+  --on-sage-variant: #3d4b34;
+  --sage-outline: #bbccad;
 
-  --tertiary: #645b4b;
-  --tertiary-fixed: #efe1cc;
-  --on-tertiary-fixed-variant: #4e4637;
+  /* --- tertiary / archive --- */
+  --archive: #efe1cc;
+  --on-archive: #4e4637;
 
-  --error: #ba1a1a;
   --error-container: #ffdad6;
   --on-error-container: #93000a;
 
-  /* Depth is a ghost border, not a shadow. */
-  --ghost-border: 1px solid rgba(135, 115, 109, 0.15);
-
-  /* 8px rhythm. */
-  --unit: 8px;
-  --element-gap: 16px;
-  --gutter: 24px;
-  --section-gap: 64px;
-  --margin-mobile: 20px;
-  --container-max: 1120px;
-
-  /* Soft, never sharp. 4px for controls, 8px for cards and photos. */
-  --radius: 4px;
-  --radius-lg: 8px;
+  /* --- shape: the redesign is markedly rounder than DESIGN.md's 4/8px --- */
+  --r-tag: 3px;
+  --r-image: 12px;
+  --r-row: 14px;
+  --r-block: 16px;
+  --r-hero: 22px;
+  --r-pill: 999px;
 
   --serif: "Source Serif 4", Georgia, serif;
   --sans: "Work Sans", system-ui, -apple-system, sans-serif;
+
+  --page-max: 1120px;
 }
 
 *,
@@ -81,7 +91,7 @@ body {
   color: var(--on-surface);
   font-family: var(--sans);
   font-size: 16px;
-  line-height: 24px;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -90,235 +100,535 @@ h2,
 h3 {
   font-family: var(--serif);
   margin: 0;
+  font-weight: 600;
 }
 
-/* --- type scale ---------------------------------------------------------- */
+/* --- recurring type ------------------------------------------------------ */
 
-.display-lg {
+/* The uppercase letterspaced label the redesign uses above every section. */
+.eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--outline);
+}
+
+.eyebrow--on-ink {
+  color: rgba(249, 239, 232, 0.85);
+  letter-spacing: 0.12em;
+}
+
+.display {
   font-family: var(--serif);
   font-size: 42px;
-  line-height: 52px;
+  line-height: 1.1;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
-.headline-lg {
+
+.headline {
   font-family: var(--serif);
-  font-size: 32px;
-  line-height: 40px;
+  font-size: 30px;
+  line-height: 1.2;
   font-weight: 600;
 }
-.headline-md {
-  font-family: var(--serif);
-  font-size: 24px;
-  line-height: 32px;
-  font-weight: 500;
+
+.muted {
+  color: var(--on-surface-variant);
 }
-.body-lg {
-  font-size: 18px;
-  line-height: 28px;
-}
-.body-md {
-  font-size: 16px;
-  line-height: 24px;
-}
-.label-md {
-  font-size: 14px;
-  line-height: 20px;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-}
-.label-sm {
-  font-size: 12px;
-  line-height: 16px;
+
+/* --- archival tag chips -------------------------------------------------- */
+/* Rectangular and barely rounded on purpose — a tag tied to an object, not a
+ * pill. Uppercase and letterspaced so it reads as a catalogue mark. */
+
+.tag {
+  display: inline-block;
+  border-radius: var(--r-tag);
+  padding: 4px 9px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border: 1px solid transparent;
 }
 
-/* --- app shell ----------------------------------------------------------- */
-
-.app-bar {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: var(--surface);
-  border-bottom: var(--ghost-border);
+.tag--unclaimed {
+  background: var(--surface-high);
+  color: var(--outline);
 }
-
-.app-bar__inner {
-  max-width: var(--container-max);
-  margin: 0 auto;
-  padding: 0 var(--gutter);
-  height: 64px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--element-gap);
+.tag--claimed {
+  background: var(--clay-tint);
+  color: var(--on-clay-tint);
 }
-
-.app-bar__brand {
-  font-family: var(--serif);
-  font-size: 24px;
-  line-height: 32px;
-  font-weight: 500;
+.tag--contested {
+  background: var(--archive);
+  color: var(--on-archive);
+}
+.tag--resolved {
+  background: var(--sage);
+  color: var(--on-sage);
+}
+.tag--routed {
+  background: var(--surface-highest);
+  color: var(--on-surface-variant);
+}
+/* Still an open question — the dashed treatment the redesign gives "You". */
+.tag--needs_clarification {
+  background: transparent;
+  border: 1px dashed var(--outline);
   color: var(--primary);
 }
 
-.app-bar__who {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: var(--on-surface-variant);
-  min-width: 0;
+/* Outlined tags over photography / the dark hero. */
+.tag--on-ink {
+  background: transparent;
+  border: 1px solid rgba(249, 239, 232, 0.45);
+  color: var(--on-ink);
+  border-radius: 4px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
-.app-bar__email {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 30ch;
-}
-
-.page {
-  max-width: var(--container-max);
-  margin: 0 auto;
-  padding: 32px var(--gutter) var(--section-gap);
-}
-
-@media (max-width: 640px) {
-  .app-bar__inner,
-  .page {
-    padding-left: var(--margin-mobile);
-    padding-right: var(--margin-mobile);
-  }
-  .app-bar__email {
-    max-width: 14ch;
-  }
-}
-
-/* --- controls ------------------------------------------------------------ */
+/* --- actions ------------------------------------------------------------- */
 
 .button {
   font-family: var(--sans);
-  font-size: 16px;
-  font-weight: 500;
-  border-radius: var(--radius);
+  font-weight: 600;
+  border-radius: var(--r-pill);
   border: 1px solid transparent;
-  padding: 12px 20px;
+  /* A pill that wraps stops being a pill — "Sign out" broke over two lines in
+   * the narrow app bar before this. */
+  white-space: nowrap;
   cursor: pointer;
-  transition: background-color 140ms ease, color 140ms ease;
+  transition: background-color 150ms ease, color 150ms ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 .button--primary {
+  height: 54px;
+  padding: 0 28px;
   background: var(--primary);
   color: var(--on-primary);
+  font-size: 15px;
 }
 .button--primary:hover:not(:disabled) {
-  background: var(--on-primary-fixed-variant);
+  background: var(--primary-hover);
 }
 .button--primary:disabled {
-  background: var(--surface-container-highest);
-  color: var(--on-surface-variant);
+  background: var(--surface-highest);
+  color: var(--outline);
   cursor: default;
 }
 
-.button--quiet {
-  background: transparent;
-  color: var(--on-surface-variant);
-  border-color: var(--secondary-fixed-dim);
-  padding: 8px 14px;
+/* The cream call-to-action that sits on the dark hero. */
+.button--cream {
+  height: 52px;
+  padding: 0 26px;
+  background: var(--on-ink);
+  color: var(--ink);
+  font-size: 15px;
+}
+.button--cream:hover:not(:disabled) {
+  background: #ffffff;
+}
+.button--cream:disabled {
+  background: rgba(249, 239, 232, 0.35);
+  color: rgba(33, 26, 20, 0.5);
+  cursor: default;
+}
+
+.button--sage {
+  height: 44px;
+  padding: 0 20px;
+  background: none;
+  border-color: var(--sage-outline);
+  color: var(--on-sage-variant);
   font-size: 14px;
 }
-.button--quiet:hover {
-  background: rgba(215, 232, 200, 0.35);
+.button--sage:hover {
+  background: rgba(215, 232, 200, 0.28);
 }
+
+.button--ghost-ink {
+  height: 40px;
+  padding: 0 18px;
+  background: none;
+  border-color: var(--ink-hairline);
+  color: var(--on-ink-muted);
+  font-size: 13.5px;
+}
+.button--ghost-ink:hover {
+  background: rgba(249, 239, 232, 0.08);
+  color: var(--on-ink);
+}
+
+/* --- inputs -------------------------------------------------------------- */
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 7px;
 }
 
-.field label {
-  font-size: 14px;
+/* Sentence case, not the uppercase letterspaced treatment used for eyebrows and
+ * tags. A field label is an instruction to a person, not a catalogue mark — and
+ * uppercase labels are most of what made this screen read as enterprise. */
+.field > label {
+  font-size: 13.5px;
   font-weight: 500;
-  letter-spacing: 0.01em;
-  color: var(--on-surface-variant);
+  color: rgba(249, 239, 232, 0.74);
 }
 
+/* Warm cream fill, even sitting on the dark photograph. A translucent dark field
+ * disappears into whatever is behind it — the input stops looking like somewhere
+ * you can type. Cream keeps it an object on the surface. */
 .field input {
   font-family: var(--sans);
   font-size: 16px;
-  line-height: 24px;
-  padding: 12px 14px;
+  height: 52px;
+  padding: 0 18px;
   color: var(--on-surface);
-  background: var(--surface-container-low);
+  background: var(--surface-low);
   border: 1px solid var(--outline-variant);
-  border-radius: var(--radius);
+  border-radius: var(--r-row);
+}
+
+.field input::placeholder {
+  color: var(--outline);
 }
 
 .field input:focus {
-  outline: 2px solid var(--primary-container);
-  outline-offset: 1px;
+  outline: none;
+  border-color: var(--primary);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px rgba(142, 72, 49, 0.22);
 }
 
-/* --- sign in ------------------------------------------------------------- */
+/* --- the mark ------------------------------------------------------------ */
+
+.lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.lockup__name {
+  font-family: var(--serif);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  color: currentColor;
+}
+
+/* --- sign in: a full-bleed gable, the form sitting on it ------------------ */
 
 .signin {
+  position: relative;
   min-height: 100dvh;
+  background: var(--ink-deep);
+  overflow: hidden;
   display: grid;
-  place-items: center;
-  padding: var(--gutter);
+  place-items: end center;
 }
 
-.signin__card {
+/* The photograph. Greyscale on disk — the colour comes from the duotone layer
+ * below, which is what makes it read as brand imagery rather than a picture of
+ * one particular building. */
+.signin__photo {
+  position: absolute;
+  inset: 0;
+  background-image: url("/brand/hero-gable-portrait.jpg");
+  background-size: cover;
+  background-position: 50% 22%;
+}
+
+.signin__duotone {
+  position: absolute;
+  inset: 0;
+  mix-blend-mode: color;
+  opacity: 0.86;
+  background: linear-gradient(150deg, rgba(194, 112, 80, 0.06) 0%, #8e4831 42%, var(--ink) 100%);
+}
+
+/* Legibility, in two parts. The top band is there for the lockup — both crops
+ * have pale sky in that corner, and a cream mark on blown-out sky is unreadable.
+ * The lower ramp carries the frame down to near-black under the form. */
+.signin__scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(23, 17, 12, 0.55) 0%, rgba(23, 17, 12, 0) 18%),
+    linear-gradient(
+      180deg,
+      rgba(23, 17, 12, 0.1) 20%,
+      rgba(23, 17, 12, 0.55) 52%,
+      rgba(23, 17, 12, 0.88) 78%,
+      #171110 100%
+    );
+}
+
+.signin__body {
+  position: relative;
   width: 100%;
-  max-width: 420px;
-  background: var(--surface-container-lowest);
-  border: var(--ghost-border);
-  border-radius: var(--radius-lg);
-  padding: 40px;
+  max-width: 452px;
+  min-height: 100dvh;
+  padding: 30px 24px 34px;
   display: flex;
   flex-direction: column;
-  gap: var(--gutter);
+  color: var(--on-ink);
 }
 
-.signin__brand {
+/* Pushes the welcome and everything under it to the lower half, leaving the
+ * roofline clear at the top. */
+.signin__welcome {
+  margin-top: auto;
+}
+
+.signin__head {
   font-family: var(--serif);
-  font-size: 42px;
-  line-height: 52px;
+  font-size: 36px;
+  line-height: 1.14;
   font-weight: 600;
-  letter-spacing: -0.02em;
-  color: var(--primary);
+  letter-spacing: -0.015em;
+  margin: 0;
+  color: var(--on-ink);
 }
 
-.signin__tagline {
-  color: var(--on-surface-variant);
-  margin: 4px 0 0;
+.signin__under {
+  margin: 10px 0 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: rgba(249, 239, 232, 0.72);
+  max-width: 32ch;
 }
 
 .signin__form {
+  margin-top: 24px;
   display: flex;
   flex-direction: column;
-  gap: var(--element-gap);
+  gap: 13px;
 }
 
-/* --- notices ------------------------------------------------------------- */
-/* Failures are stated plainly and visibly — never a silent guess. */
+/* On a wide screen the form moves off centre and the scrim turns horizontal:
+ * the gable then sits *beside* the form instead of behind the headline, which
+ * is the only way a near-symmetrical apex and a centred column can share a
+ * frame without fighting. */
+@media (min-aspect-ratio: 1/1) {
+  .signin {
+    place-items: center start;
+  }
 
-.notice {
-  border-radius: var(--radius);
-  padding: 12px 14px;
-  border: 1px solid var(--outline-variant);
-  background: var(--surface-container);
+  .signin__photo {
+    background-image: url("/brand/hero-gable-landscape.jpg");
+    background-position: 62% 34%;
+  }
+
+  .signin__body {
+    max-width: 520px;
+    padding: 40px 32px 40px 72px;
+    justify-content: center;
+  }
+
+  /* Out of flow, so the form centres on the viewport rather than being pushed
+   * down by the mark — and the mark keeps the corner it has on the phone. */
+  .signin__body > .lockup {
+    position: absolute;
+    top: 40px;
+    left: 72px;
+  }
+
+  .signin__welcome {
+    margin-top: 0;
+  }
+
+  .signin__scrim {
+    background:
+      linear-gradient(180deg, rgba(23, 17, 12, 0.4) 0%, rgba(23, 17, 12, 0) 22%),
+      linear-gradient(
+        90deg,
+        #171110 0%,
+        rgba(23, 17, 12, 0.86) 26%,
+        rgba(23, 17, 12, 0.42) 52%,
+        rgba(23, 17, 12, 0.18) 74%,
+        rgba(23, 17, 12, 0.45) 100%
+      ),
+      linear-gradient(180deg, rgba(23, 17, 12, 0) 55%, rgba(23, 17, 12, 0.5) 100%);
+  }
+}
+
+.signin__foot {
+  margin: 14px 0 0;
+  text-align: center;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: rgba(249, 239, 232, 0.5);
+}
+
+@media (min-height: 900px) {
+  .signin__head {
+    font-size: 42px;
+  }
+}
+
+/* --- app shell ----------------------------------------------------------- */
+
+.page {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 20px 24px 72px;
+}
+
+/* --- the dark hero ------------------------------------------------------- */
+
+.hero {
+  background: var(--ink);
+  color: var(--on-ink);
+  border-radius: var(--r-hero);
+  padding: 22px 26px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* The same gable, carried through after sign-in — but held well back. Here it is
+ * texture behind a working screen, not the subject: the ink layer sits at high
+ * opacity so the estate name, the marks and the ledger below all stay first.
+ * A hero as emphatic as the sign-in would make the inventory feel like a
+ * landing page every time someone opened it. */
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    /* Top band: the app-bar row (email, Sign out) runs the full width, and the
+       right of the frame is the brightest part of the photograph. */
+    linear-gradient(180deg, rgba(23, 17, 12, 0.72) 0%, rgba(23, 17, 12, 0) 52%),
+    linear-gradient(
+      104deg,
+      rgba(23, 17, 12, 0.97) 0%,
+      rgba(33, 26, 20, 0.94) 38%,
+      rgba(142, 72, 49, 0.82) 74%,
+      rgba(33, 26, 20, 0.9) 100%
+    ),
+    url("/brand/hero-gable-landscape.jpg");
+  background-size: cover;
+  background-position: 50% 26%;
+  pointer-events: none;
+}
+
+.hero > * {
+  position: relative;
+}
+
+.hero__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.hero__who {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.hero__email {
+  font-size: 12.5px;
+  color: var(--on-ink-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 32ch;
+}
+
+.hero__title {
+  margin: 6px 0 0;
+  color: var(--on-ink);
+}
+
+.hero__marks {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* --- ledger blocks ------------------------------------------------------- */
+/* Big tonal counts. A ledger, not a score: no bars, no targets, no percentage
+ * of "done" — just how many things are where. */
+
+.ledger {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.ledger__block {
+  border-radius: var(--r-block);
+  padding: 16px 18px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 108px;
+  justify-content: space-between;
+  border: 1px solid transparent;
+}
+
+.ledger__label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.ledger__value {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.ledger__number {
+  font-family: var(--serif);
+  font-size: 40px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.ledger__unit {
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 0.78;
+}
+
+.ledger__block--sage {
+  background: var(--sage);
+  color: var(--on-sage);
+}
+.ledger__block--clay {
+  background: var(--primary-block);
+  color: #fffbff;
+}
+.ledger__block--quiet {
+  background: var(--surface-mid);
   color: var(--on-surface-variant);
-  font-size: 14px;
-  line-height: 20px;
+  border-color: var(--hairline);
 }
-
-.notice--problem {
-  background: var(--error-container);
-  border-color: var(--error-container);
-  color: var(--on-error-container);
+.ledger__block--archive {
+  background: var(--archive);
+  color: var(--on-archive);
 }
 
 /* --- filters ------------------------------------------------------------- */
@@ -326,82 +636,79 @@ h3 {
 .filters {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--unit);
-  margin: var(--element-gap) 0 var(--gutter);
+  gap: 8px;
+  margin: 26px 0 16px;
 }
 
 .filter {
   font-family: var(--sans);
-  font-size: 14px;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  padding: 8px 14px;
-  border-radius: var(--radius);
-  border: var(--ghost-border);
-  background: var(--surface-container-high);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 7px 12px;
+  border-radius: var(--r-tag);
+  border: 1px solid var(--hairline);
+  background: var(--surface-high);
   color: var(--on-surface-variant);
   cursor: pointer;
-  transition: background-color 140ms ease;
+  transition: background-color 150ms ease, color 150ms ease;
   display: inline-flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 7px;
 }
 
 .filter:hover:not(.filter--on) {
-  background: var(--surface-container-highest);
+  background: var(--surface-highest);
 }
 
 .filter--on {
-  background: rgba(215, 232, 200, 0.5);
-  border-color: var(--secondary-container);
-  color: var(--on-secondary-container);
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--on-ink);
 }
 
-/* A status with nothing in it stays visible and legible — hiding it would hide
- * a real state the data model allows. */
+/* A status with nothing in it stays legible — hiding it would hide a real
+ * state the data model allows. */
 .filter--empty {
-  opacity: 0.65;
+  opacity: 0.55;
 }
 
 .filter__count {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.03em;
-  color: var(--outline);
-}
-
-.filter--on .filter__count {
-  color: var(--on-secondary-container);
+  opacity: 0.6;
 }
 
 /* --- item grid ----------------------------------------------------------- */
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(288px, 1fr));
-  gap: var(--element-gap);
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
 }
 
 .card {
-  background: var(--surface-container-lowest);
-  border: var(--ghost-border);
-  border-radius: var(--radius-lg);
+  background: var(--surface-lowest);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-row);
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  /* No lift on hover — a tonal shift only. */
-  transition: background-color 140ms ease;
+  transition: background-color 150ms ease;
 }
 
 .card:hover {
-  background: rgba(215, 232, 200, 0.12);
+  background: var(--surface-low);
 }
 
 .card__photo {
   position: relative;
-  height: 176px;
-  background: var(--surface-container);
-  border-bottom: var(--ghost-border);
+  height: 180px;
+  margin: 10px 10px 0;
+  border-radius: var(--r-image);
+  overflow: hidden;
+  background: var(--surface-mid);
 }
 
 .card__photo img {
@@ -411,47 +718,57 @@ h3 {
   display: block;
 }
 
-/* No photo yet: a quiet tonal panel naming the category, rather than a stock
- * photograph of somebody else's family. */
+/* No photo yet: a quiet tonal plate, not a stock photograph of somebody
+ * else's family. */
 .card__photo--empty {
   display: grid;
   place-items: center;
-  text-align: center;
-  padding: var(--element-gap);
+  background:
+    radial-gradient(120% 100% at 20% 0%, rgba(172, 96, 70, 0.08) 0%, rgba(246, 236, 229, 0) 60%),
+    var(--surface-mid);
   color: var(--outline);
+}
+
+.card__photo--empty span {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
 .card__chip {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 10px;
+  right: 10px;
 }
 
 .card__body {
-  padding: var(--element-gap);
+  padding: 16px 18px 18px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
+  flex: 1;
 }
 
-.card__category {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--tertiary);
+.card__marks {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .card__title {
   font-family: var(--serif);
   font-size: 24px;
-  line-height: 32px;
-  font-weight: 500;
+  line-height: 1.2;
+  font-weight: 600;
   color: var(--on-surface);
 }
 
 .card__notes {
   color: var(--on-surface-variant);
+  font-size: 14.5px;
+  line-height: 1.6;
+  margin: 0;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
@@ -459,68 +776,394 @@ h3 {
 }
 
 .card__foot {
-  margin-top: var(--unit);
+  margin-top: auto;
   padding-top: 12px;
-  border-top: var(--ghost-border);
+  border-top: 1px solid var(--hairline);
   display: flex;
   justify-content: space-between;
+  align-items: baseline;
   gap: 12px;
-  color: var(--on-surface-variant);
-  font-size: 12px;
-  letter-spacing: 0.03em;
-}
-
-/* --- status chips -------------------------------------------------------- */
-/* Deliberately desaturated: the dashboard should not feel alarm-driven. */
-
-.chip {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: var(--radius);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.03em;
-  border: 1px solid transparent;
-  white-space: nowrap;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--outline);
 }
 
-.chip--unclaimed {
-  background: var(--surface-container-highest);
+/* --- notices and empty states -------------------------------------------- */
+/* Failures are stated plainly and visibly — never a silent guess. */
+
+.notice {
+  border-radius: var(--r-row);
+  padding: 14px 18px;
+  border: 1px solid var(--hairline);
+  background: var(--surface-mid);
   color: var(--on-surface-variant);
-  border-color: var(--outline-variant);
-}
-.chip--claimed {
-  background: var(--secondary-container);
-  color: var(--on-secondary-container);
-}
-.chip--contested {
-  background: #f2e2c4;
-  color: #7a5320;
-}
-.chip--resolved {
-  background: var(--secondary-fixed-dim);
-  color: var(--on-secondary-fixed-variant);
-}
-.chip--routed {
-  background: var(--tertiary-fixed);
-  color: var(--on-tertiary-fixed-variant);
-}
-.chip--needs_clarification {
-  background: var(--primary-fixed);
-  color: var(--on-primary-fixed-variant);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-/* --- empty states -------------------------------------------------------- */
+.notice--problem {
+  background: var(--error-container);
+  border-color: var(--error-container);
+  color: var(--on-error-container);
+}
+
+.notice--on-ink {
+  background: rgba(186, 26, 26, 0.16);
+  border-color: rgba(255, 181, 157, 0.4);
+  color: #ffdad6;
+}
 
 .empty {
   border: 1px dashed var(--outline-variant);
-  border-radius: var(--radius-lg);
-  padding: 48px var(--gutter);
+  border-radius: var(--r-row);
+  padding: 56px 24px;
   text-align: center;
   color: var(--on-surface-variant);
-  background: var(--surface-container-low);
+  background: var(--surface-low);
+  font-size: 17px;
 }
 
-.muted {
+/* --- item detail: the placard -------------------------------------------- */
+
+.hero--slim {
+  gap: 12px;
+  padding-bottom: 18px;
+}
+
+.hero__back {
+  text-decoration: none;
+  color: inherit;
+}
+
+.hero__crumb {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--on-ink-muted);
+  text-decoration: none;
+  width: fit-content;
+}
+
+.hero__crumb:hover {
+  color: var(--on-ink);
+}
+
+/* Card is a link now — kill the inherited anchor styling. */
+.card {
+  text-decoration: none;
+  color: inherit;
+}
+
+.placard {
+  margin-top: 16px;
+  background: var(--surface-lowest);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-row);
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+}
+
+.placard__photo {
+  position: relative;
+  min-height: 340px;
+  background: var(--surface-mid);
+  border-right: 1px solid var(--hairline);
+}
+
+.placard__photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.placard__body {
+  padding: 28px 30px 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.placard__marks {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.placard__title {
+  font-family: var(--serif);
+  font-size: 36px;
+  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  margin: 0;
+}
+
+.placard__notes {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.65;
   color: var(--on-surface-variant);
+  max-width: 56ch;
+}
+
+/* Facts as a definition list: a museum placard, not a stat row. */
+.placard__facts {
+  margin: 4px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-top: 1px solid var(--hairline);
+  padding-top: 16px;
+}
+
+.placard__facts > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.placard__facts dt {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--outline);
+}
+
+.placard__facts dd {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--on-surface-variant);
+}
+
+/* --- claiming ------------------------------------------------------------ */
+
+.claim {
+  margin-top: 6px;
+  padding-top: 18px;
+  border-top: 1px solid var(--hairline);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.claim__label {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--on-surface-variant);
+}
+
+.claim__comment {
+  width: 100%;
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.5;
+  padding: 12px 14px;
+  color: var(--on-surface);
+  background: var(--surface-low);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--r-row);
+  resize: vertical;
+}
+
+.claim__comment:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(142, 72, 49, 0.22);
+}
+
+/* --- the thread ---------------------------------------------------------- */
+
+.thread-section {
+  margin-top: 34px;
+}
+
+.thread-section .eyebrow {
+  display: block;
+  margin-bottom: 14px;
+}
+
+.thread {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.msg {
+  border-radius: var(--r-row);
+  padding: 16px 20px 18px;
+  border: 1px solid var(--hairline);
+  background: var(--surface-lowest);
+}
+
+.msg__head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.msg__who {
+  font-family: var(--serif);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--on-surface);
+}
+
+.msg__when {
+  font-size: 12px;
+  color: var(--outline);
+  margin-left: auto;
+}
+
+.msg__text {
+  margin: 0 0 10px;
+  font-size: 15.5px;
+  line-height: 1.65;
+  color: var(--on-surface-variant);
+}
+
+.msg__text:last-child {
+  margin-bottom: 0;
+}
+
+/* Steward's own voice: sage-tinted and set slightly apart, but a participant in
+ * the feed rather than a system banner. */
+.msg--agent {
+  background: rgba(215, 232, 200, 0.28);
+  border-color: var(--sage-outline);
+}
+
+.msg--agent .msg__who {
+  color: var(--on-sage-variant);
+}
+
+.msg--agent .msg__text {
+  color: #33402a;
+}
+
+/* The mediation post on a contested item. Lifted with a clay edge and more
+ * room — no shadow, no alarm colour, no badge shouting for attention. */
+.msg--prominent {
+  background: var(--surface-low);
+  border: 1px solid var(--outline-variant);
+  border-left: 3px solid var(--primary);
+  padding: 22px 26px 24px;
+}
+
+.msg--prominent .msg__who {
+  color: var(--primary);
+}
+
+.msg--prominent .msg__text {
+  color: var(--on-surface);
+  font-size: 16.5px;
+}
+
+@media (max-width: 820px) {
+  .placard {
+    grid-template-columns: 1fr;
+  }
+  .placard__photo {
+    min-height: 240px;
+    border-right: none;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .placard__body {
+    padding: 22px;
+  }
+  .placard__title {
+    font-size: 30px;
+  }
+}
+
+/* Nothing photographed yet: the empty panel becomes a slim band across the top
+ * rather than a tall column of cream beside the text. The placeholder still
+ * says what it is — it just stops taking up half the placard to say it. */
+.placard--no-photo {
+  grid-template-columns: 1fr;
+}
+
+.placard--no-photo .placard__photo {
+  min-height: 0;
+  height: 132px;
+  border-right: none;
+  border-bottom: 1px solid var(--hairline);
+}
+
+/* --- who's asked ---------------------------------------------------------- */
+/* Sits between the placard and the thread: who put their name forward, then
+ * what has been said about it. On a contested item this is what makes the
+ * agent's mediation legible — otherwise the claimants' names appear only inside
+ * the message text. */
+
+.claimants {
+  margin-top: 30px;
+}
+
+.claimants .eyebrow {
+  display: block;
+  margin-bottom: 14px;
+}
+
+.claimants__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.claimant {
+  background: var(--surface-lowest);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-row);
+  padding: 16px 20px 18px;
+}
+
+.claimant__head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.claimant__who {
+  font-family: var(--serif);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--on-surface);
+}
+
+.claimant__when {
+  font-size: 12px;
+  color: var(--outline);
+  margin-left: auto;
+}
+
+/* The reason someone gave, set as the quotation it is. */
+.claimant__comment {
+  margin: 0;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 16.5px;
+  line-height: 1.6;
+  color: var(--on-surface-variant);
+}
+
+.claimant__silent {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--outline);
 }

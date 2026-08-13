@@ -1,7 +1,18 @@
 import { useState, type FormEvent } from 'react'
 
 import { readableAuthError, useAuth } from '../auth'
+import { StewardLockup } from '../components/StewardMark'
 
+/** Sign-in: a full-bleed gable, the form sitting on it.
+ *
+ * The photograph is greyscale on disk and gets its colour from a clay-to-ink
+ * duotone layer in CSS. That's what turns a picture of one particular building
+ * into brand imagery rather than a stand-in for the family's own house — the
+ * distinction docs/estate-agent-branding.md draws.
+ *
+ * Portrait and landscape crops of the same gable are swapped by media query in
+ * index.css, so a phone gets the tall frame and a desktop the wide one.
+ */
 export function SignIn() {
   const { signIn } = useAuth()
   const [email, setEmail] = useState('')
@@ -25,10 +36,23 @@ export function SignIn() {
 
   return (
     <div className="signin">
-      <main className="signin__card">
-        <div>
-          <h1 className="signin__brand">Steward</h1>
-          <p className="signin__tagline body-lg">Decide together. Steward it well.</p>
+      <div className="signin__photo" aria-hidden="true">
+        <div className="signin__duotone" />
+        <div className="signin__scrim" />
+      </div>
+
+      <main className="signin__body">
+        <StewardLockup size={26} color="var(--on-ink)" />
+
+        <div className="signin__welcome">
+          <h1 className="signin__head">
+            Welcome back,
+            <br />
+            take your time.
+          </h1>
+          <p className="signin__under">
+            The house will be exactly where you left it.
+          </p>
         </div>
 
         <form className="signin__form" onSubmit={onSubmit}>
@@ -38,6 +62,7 @@ export function SignIn() {
               id="email"
               type="email"
               autoComplete="username"
+              placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -57,18 +82,20 @@ export function SignIn() {
           </div>
 
           {problem && (
-            <p className="notice notice--problem" role="alert">
+            <p className="notice notice--on-ink" role="alert">
               {problem}
             </p>
           )}
 
+          {/* Clay, not cream: with cream fields above it, a cream button reads as
+              a third input rather than the thing you press. */}
           <button className="button button--primary" type="submit" disabled={working}>
             {working ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
 
-        <p className="muted label-md" style={{ margin: 0 }}>
-          Invited to an estate? Sign in with the address the invitation went to.
+        <p className="signin__foot">
+          Invited to an estate? Use the link in your invitation.
         </p>
       </main>
     </div>

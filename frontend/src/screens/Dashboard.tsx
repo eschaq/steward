@@ -5,10 +5,15 @@ import { useAuth } from '../auth'
 import { ESTATE_ID } from '../firebase'
 import { ItemCard } from '../components/ItemCard'
 import { StatusFilters, type Filter } from '../components/StatusFilters'
+import { StewardLockup } from '../components/StewardMark'
 import { ITEM_STATUSES, STATUS_LABEL, type Item, type ItemStatus } from '../types'
 
 function emptyCounts(): Record<ItemStatus, number> {
   return Object.fromEntries(ITEM_STATUSES.map((s) => [s, 0])) as Record<ItemStatus, number>
+}
+
+function plural(count: number, one: string, many: string): string {
+  return `${count} ${count === 1 ? one : many}`
 }
 
 export function Dashboard() {
@@ -49,69 +54,115 @@ export function Dashboard() {
     [items, filter],
   )
 
+  const total = items?.length ?? 0
+  // A ledger, not a score: how many things are where, with no target to hit.
+  const settled = counts.resolved + counts.routed
+
+  // A block with nothing in it drops to the quiet tone. A big clay-red 0 would
+  // be shouting about an absence of anything to shout about.
+  const tone = (count: number, colour: string) =>
+    `ledger__block ledger__block--${count === 0 ? 'quiet' : colour}`
+
   return (
-    <>
-      <header className="app-bar">
-        <div className="app-bar__inner">
-          <span className="app-bar__brand">Steward</span>
-          <div className="app-bar__who">
-            <span className="app-bar__email label-md">{user?.email}</span>
-            <button className="button button--quiet" type="button" onClick={() => void leave()}>
+    <div className="page">
+      <header className="hero">
+        <div className="hero__top">
+          <StewardLockup size={24} color="var(--on-ink)" />
+          <div className="hero__who">
+            <span className="hero__email">{user?.email}</span>
+            <button
+              className="button button--ghost-ink"
+              type="button"
+              onClick={() => void leave()}
+            >
               Sign out
             </button>
           </div>
         </div>
+
+        <div>
+          <div className="eyebrow eyebrow--on-ink">{ESTATE_ID}</div>
+          <h1 className="display hero__title">Inventory</h1>
+        </div>
+
+        {items !== null && (
+          <div className="hero__marks">
+            <span className="tag tag--on-ink">{plural(total, 'belonging', 'belongings')}</span>
+            <span className="tag tag--on-ink">
+              {plural(counts.unclaimed, 'unspoken for', 'unspoken for')}
+            </span>
+            <span className="tag tag--on-ink">
+              {plural(counts.claimed, 'spoken for', 'spoken for')}
+            </span>
+          </div>
+        )}
       </header>
 
-      <main className="page">
-        <h1 className="headline-lg">Inventory</h1>
-        <p className="muted body-md" style={{ marginTop: 4 }}>
-          {items === null
-            ? 'Looking through the estate…'
-            : `${items.length} ${items.length === 1 ? 'belonging' : 'belongings'} in this estate. Take your time.`}
+      {items !== null && (
+        <div className="ledger">
+          <div className={tone(settled, 'sage')}>
+            <div className="ledger__label">Settled</div>
+            <div className="ledger__value">
+              <span className="ledger__number">{settled}</span>
+              <span className="ledger__unit">
+                {settled === 1 ? 'item' : 'items'} decided
+              </span>
+            </div>
+          </div>
+
+          <div className={tone(counts.contested, 'clay')}>
+            <div className="ledger__label">Needs a talk</div>
+            <div className="ledger__value">
+              <span className="ledger__number">{counts.contested}</span>
+              <span className="ledger__unit">
+                {counts.contested === 1 ? 'item' : 'items'} contested
+              </span>
+            </div>
+          </div>
+
+          <div className={tone(counts.needs_clarification, 'archive')}>
+            <div className="ledger__label">Needs a look</div>
+            <div className="ledger__value">
+              <span className="ledger__number">{counts.needs_clarification}</span>
+              <span className="ledger__unit">Steward has asked</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <StatusFilters active={filter} counts={counts} total={total} onChange={setFilter} />
+
+      {problem && (
+        <p className="notice notice--problem" role="alert">
+          <span>{problem}</span>
+          <button className="button button--sage" type="button" onClick={() => void load()}>
+            Try again
+          </button>
         </p>
+      )}
 
-        <StatusFilters
-          active={filter}
-          counts={counts}
-          total={items?.length ?? 0}
-          onChange={setFilter}
-        />
+      {!problem && items === null && (
+        <p className="notice">Looking through the estate…</p>
+      )}
 
-        {problem && (
-          <p className="notice notice--problem" role="alert">
-            {problem}{' '}
-            <button
-              className="button button--quiet"
-              type="button"
-              style={{ marginLeft: 8 }}
-              onClick={() => void load()}
-            >
-              Try again
-            </button>
-          </p>
-        )}
+      {!problem && items !== null && shown.length === 0 && (
+        <div className="empty">
+          {total === 0
+            ? 'Nothing catalogued in this estate yet.'
+            : /* Quoted, not inlined: "Nothing is needs a talk right now" is what
+                 you get when a label is dropped into a sentence that assumes an
+                 adjective. */
+              `Nothing is marked “${STATUS_LABEL[filter as ItemStatus]}” right now.`}
+        </div>
+      )}
 
-        {!problem && items === null && <p className="notice">Loading the inventory…</p>}
-
-        {!problem && items !== null && shown.length === 0 && (
-          <div className="empty">
-            <p className="body-lg" style={{ margin: 0 }}>
-              {items.length === 0
-                ? 'Nothing catalogued in this estate yet.'
-                : `Nothing is ${STATUS_LABEL[filter as ItemStatus].toLowerCase()} right now.`}
-            </p>
-          </div>
-        )}
-
-        {shown.length > 0 && (
-          <div className="grid">
-            {shown.map((item) => (
-              <ItemCard key={item.id} item={item} />
-            ))}
-          </div>
-        )}
-      </main>
-    </>
+      {shown.length > 0 && (
+        <div className="grid">
+          {shown.map((item) => (
+            <ItemCard key={item.id} item={item} />
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Steward — sign-in v2, hero bleed + logo</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400..700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --surface:#fff8f4; --surface-low:#fcf2ea; --surface-mid:#f6ece5;
+    --on-surface:#1f1b17; --on-surface-variant:#54433e; --outline:#87736d; --outline-variant:#d9c1ba;
+    --primary:#8e4831; --ink:#211a14; --on-ink:#f9efe8;
+    --serif:"Source Serif 4",Georgia,serif; --sans:"Work Sans",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#e7ded6;font-family:var(--sans);color:var(--on-surface);padding:40px}
+  .caption{font:600 11px/1.4 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:#6d5c56;margin:0 0 4px}
+  .sub{font:400 12.5px/1.6 var(--sans);color:rgba(31,27,23,.62);margin:0 0 16px;max-width:46ch}
+  .row{display:flex;gap:40px;align-items:flex-start;flex-wrap:wrap}
+  hr.sep{border:none;border-top:1px solid rgba(0,0,0,.09);margin:40px 0 30px}
+
+  /* ---------- logo ---------- */
+  .logolab{background:var(--surface);border-radius:14px;padding:26px 30px;display:flex;
+    gap:44px;align-items:center;flex-wrap:wrap;border:1px solid rgba(135,115,109,.18)}
+  .lockup{display:flex;align-items:center;gap:10px}
+  .lockup .name{font:600 26px/1 var(--serif);color:var(--primary);letter-spacing:.01em}
+  .lockup.sm .name{font-size:19px}
+  .badge{width:44px;height:44px;border-radius:11px;background:var(--primary);
+    display:grid;place-items:center}
+  .badge.dark{background:var(--ink)}
+
+  /* ---------- phone ---------- */
+  .phone{width:402px;height:874px;border-radius:48px;overflow:hidden;position:relative;
+    background:#000;box-shadow:0 30px 60px rgba(0,0,0,.16),0 0 0 1px rgba(0,0,0,.12)}
+  .island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:126px;height:37px;
+    border-radius:24px;background:#000;z-index:50}
+  .sbar{position:absolute;top:0;left:0;right:0;height:60px;z-index:40;display:flex;
+    align-items:center;justify-content:space-between;padding:19px 32px 0;
+    font:590 17px/22px -apple-system,"SF Pro",system-ui}
+  .sbar.light{color:#fff}.sbar.dark{color:#000}
+  .bars{display:flex;gap:5px;align-items:flex-end;height:12px}
+  .bars i{display:block;width:3px;border-radius:1px;background:currentColor}
+  .hind{position:absolute;bottom:9px;left:50%;transform:translateX(-50%);width:139px;height:5px;
+    border-radius:100px;z-index:60}
+  .screen{position:absolute;inset:0;overflow:hidden}
+
+  /* ---------- shared photo treatment ---------- */
+  /* Warm duotone: grayscale base, clay-to-ink colour layer. Turns a literal
+     photograph of a specific building into brand imagery. */
+  .shot{position:absolute;inset:0;overflow:hidden}
+  .shot img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+    object-position:60% 26%;transform:scale(1.85);transform-origin:60% 26%;
+    filter:grayscale(1) contrast(1.12) brightness(.94)}
+  .shot .duo{position:absolute;inset:0;mix-blend-mode:color;opacity:.92;
+    background:linear-gradient(150deg,#c2705010 0%,#8e4831 42%,#211a14 100%)}
+  .shot .warm{position:absolute;inset:0;mix-blend-mode:overlay;opacity:.35;
+    background:linear-gradient(150deg,#ffdbd0 0%,rgba(255,219,208,0) 55%)}
+
+  /* ---------- A: full bleed, form on the photo ---------- */
+  .a .screen{background:var(--ink)}
+  .a .scrim{position:absolute;inset:0;background:
+    linear-gradient(180deg,rgba(23,17,12,.30) 0%,rgba(23,17,12,.05) 22%,
+      rgba(23,17,12,.62) 55%,rgba(23,17,12,.90) 82%,#171110 100%)}
+  .a .body{position:absolute;inset:0;padding:78px 24px 34px;display:flex;flex-direction:column;color:var(--on-ink)}
+  .a .lockup .name{color:var(--on-ink);font-size:20px}
+  .a .head{font:600 36px/1.14 var(--serif);letter-spacing:-.015em;margin:auto 0 0}
+  .a .under{font:400 15px/1.6 var(--sans);color:rgba(249,239,232,.72);margin:10px 0 0;max-width:31ch}
+  .a .form{margin-top:24px;display:flex;flex-direction:column;gap:13px}
+  .a label{font:500 13px/1.3 var(--sans);color:rgba(249,239,232,.72)}
+  .a input{font:400 16px/1 var(--sans);height:52px;padding:0 16px;border-radius:14px;
+    color:#fff;background:rgba(249,239,232,.10);border:1px solid rgba(249,239,232,.26);
+    backdrop-filter:blur(6px)}
+  .a .forgot{align-self:flex-end;font:500 13px/1 var(--sans);color:#ffb59d;text-decoration:none}
+  .a .btn{height:56px;border:none;border-radius:999px;background:var(--surface);color:var(--ink);
+    font:600 16px/1 var(--sans);margin-top:6px;cursor:pointer}
+  .a .foot{text-align:center;font:400 12.5px/1.6 var(--sans);color:rgba(249,239,232,.5);margin:14px 0 0}
+
+  /* ---------- B: photo bleeds top, dissolves into cream ---------- */
+  .b .screen{background:var(--surface)}
+  .b .shotwrap{position:absolute;top:0;left:0;right:0;height:430px;overflow:hidden}
+  .b .fade{position:absolute;inset:0;background:
+    linear-gradient(180deg,rgba(255,248,244,0) 46%,rgba(255,248,244,.86) 78%,var(--surface) 100%)}
+  .b .body{position:absolute;inset:0;padding:78px 24px 34px;display:flex;flex-direction:column}
+  .b .lockup .name{color:var(--on-ink);font-size:20px;text-shadow:0 1px 12px rgba(23,17,12,.55)}
+  .b .head{font:600 34px/1.15 var(--serif);letter-spacing:-.015em;margin:238px 0 0;color:var(--on-surface)}
+  .b .under{font:400 15px/1.6 var(--sans);color:var(--on-surface-variant);margin:9px 0 0;max-width:31ch}
+  .b .form{margin-top:22px;display:flex;flex-direction:column;gap:12px}
+  .b label{font:500 13px/1.3 var(--sans);color:var(--on-surface-variant)}
+  .b input{font:400 16px/1 var(--sans);height:52px;padding:0 16px;border-radius:14px;
+    color:var(--on-surface);background:var(--surface-low);border:1px solid var(--outline-variant)}
+  .b .forgot{align-self:flex-end;font:500 13px/1 var(--sans);color:var(--primary);text-decoration:none}
+  .b .btn{height:56px;border:none;border-radius:999px;background:var(--primary);color:#fff;
+    font:600 16px/1 var(--sans);margin-top:6px;cursor:pointer}
+  .b .foot{text-align:center;font:400 12.5px/1.6 var(--sans);color:var(--outline);margin:12px 0 0}
+  .field{display:flex;flex-direction:column;gap:6px}
+</style>
+</head>
+<body>
+
+<p class="caption">1 · The mark, promoted to a logo</p>
+<p class="sub">Same drawing, redrawn tighter so it survives at 20px: roof, wall, door, chimney, and the thread beneath. Lockup, reversed-out badge, and small-size app-bar use.</p>
+<div class="logolab">
+  <div class="lockup">
+    <svg width="34" height="30" viewBox="0 0 60 52" fill="none" aria-hidden="true">
+      <g stroke="#8e4831" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 25 L30 6 L55 25"/><path d="M12 21 V44 H48 V21"/>
+        <path d="M25 44 V32 H35 V44"/><path d="M43 15 V9 H48 V19"/>
+      </g>
+      <path d="M3 49 C18 44, 42 44, 57 49" stroke="#8e4831" stroke-width="2.2"
+            stroke-linecap="round" opacity=".45" fill="none"/>
+    </svg>
+    <span class="name">Steward</span>
+  </div>
+
+  <div class="badge">
+    <svg width="26" height="23" viewBox="0 0 60 52" fill="none" aria-hidden="true">
+      <g stroke="#fff8f4" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 25 L30 6 L55 25"/><path d="M12 21 V44 H48 V21"/>
+        <path d="M25 44 V32 H35 V44"/><path d="M43 15 V9 H48 V19"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="badge dark">
+    <svg width="26" height="23" viewBox="0 0 60 52" fill="none" aria-hidden="true">
+      <g stroke="#ffb59d" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 25 L30 6 L55 25"/><path d="M12 21 V44 H48 V21"/>
+        <path d="M25 44 V32 H35 V44"/><path d="M43 15 V9 H48 V19"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="lockup sm">
+    <svg width="24" height="21" viewBox="0 0 60 52" fill="none" aria-hidden="true">
+      <g stroke="#8e4831" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 25 L30 6 L55 25"/><path d="M12 21 V44 H48 V21"/>
+        <path d="M25 44 V32 H35 V44"/>
+      </g>
+    </svg>
+    <span class="name">Steward</span>
+  </div>
+</div>
+
+<hr class="sep">
+
+<div class="row">
+
+  <!-- ===== A ===== -->
+  <div>
+    <p class="caption">2a · Full bleed — form sits on the photograph</p>
+    <p class="sub">The photo runs the whole screen; a scrim carries it down into near-black so the fields stay legible. Closest to what you described, and the most atmospheric.</p>
+    <div class="phone a">
+      <div class="island"></div>
+      <div class="sbar light"><span>9:41</span><span class="bars"><i style="height:5px"></i><i style="height:7px"></i><i style="height:9.5px"></i><i style="height:12px"></i></span></div>
+      <div class="screen">
+        <div class="shot"><img src="c2.jpg" alt=""><div class="duo"></div><div class="warm"></div></div>
+        <div class="scrim"></div>
+        <div class="body">
+          <div class="lockup">
+            <svg width="26" height="23" viewBox="0 0 60 52" fill="none"><g stroke="#f9efe8" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 25 L30 6 L55 25"/><path d="M12 21 V44 H48 V21"/><path d="M25 44 V32 H35 V44"/></g></svg>
+            <span class="name">Steward</span>
+          </div>
+          <h2 class="head">Welcome back,<br>take your time.</h2>
+          <p class="under">The house will be exactly where you left it.</p>
+          <form class="form" onsubmit="return false">
+            <div class="field"><label>Email</label><input type="email" value="ruth@thewillowhouse.family"></div>
+            <div class="field"><label>Password</label><input type="password" value="somethinglong"></div>
+            <a class="forgot" href="#">Forgot password?</a>
+            <button class="btn" type="submit">Sign in</button>
+          </form>
+          <p class="foot">Invited to an estate? Use the link in your invitation.</p>
+        </div>
+      </div>
+      <div class="hind" style="background:rgba(255,255,255,.7)"></div>
+    </div>
+  </div>
+
+  <!-- ===== B ===== -->
+  <div>
+    <p class="caption">2b · Bleeds from the top, dissolves into cream</p>
+    <p class="sub">Photo edge-to-edge at the top — no rounded plate — fading into the cream the form sits on. Warmer and easier to read; less atmospheric than 2a.</p>
+    <div class="phone b">
+      <div class="island"></div>
+      <div class="sbar light"><span>9:41</span><span class="bars"><i style="height:5px"></i><i style="height:7px"></i><i style="height:9.5px"></i><i style="height:12px"></i></span></div>
+      <div class="screen">
+        <div class="shotwrap">
+          <div class="shot"><img src="c2.jpg" alt=""><div class="duo"></div><div class="warm"></div></div>
+          <div class="fade"></div>
+        </div>
+        <div class="body">
+          <div class="lockup">
+            <svg width="26" height="23" viewBox="0 0 60 52" fill="none"><g stroke="#f9efe8" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 25 L30 6 L55 25"/><path d="M12 21 V44 H48 V21"/><path d="M25 44 V32 H35 V44"/></g></svg>
+            <span class="name">Steward</span>
+          </div>
+          <h2 class="head">Welcome back,<br>take your time.</h2>
+          <p class="under">The house will be exactly where you left it.</p>
+          <form class="form" onsubmit="return false">
+            <div class="field"><label>Email</label><input type="email" value="ruth@thewillowhouse.family"></div>
+            <div class="field"><label>Password</label><input type="password" value="somethinglong"></div>
+            <a class="forgot" href="#">Forgot password?</a>
+            <button class="btn" type="submit">Sign in</button>
+          </form>
+          <p class="foot">Invited to an estate? Use the link in your invitation.</p>
+        </div>
+      </div>
+      <div class="hind" style="background:rgba(0,0,0,.25)"></div>
+    </div>
+  </div>
+
+</div>
+
+<p class="sub" style="margin-top:22px;max-width:92ch">Photograph is a placeholder: “Bosveal Farm Cottage” by Tim Green (CC BY 2.0), hard-cropped to the gable and duotoned. The final image wants sourcing properly — see the note in chat.</p>
+
+</body>
+</html>

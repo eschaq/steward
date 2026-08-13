@@ -207,6 +207,22 @@ def post_clarifying_question(
     )
 
 
+def display_names_for(user_ids: list[str]) -> dict[str, str]:
+    """Display names for a set of authors, in one pass.
+
+    The frontend can't read `users` — firestore.rules allows a caller their own
+    document and nothing else — so a feed rendered client-side would show bare
+    uids without this. Resolved here rather than by opening up that rule.
+    """
+    db = get_db()
+    names: dict[str, str] = {}
+    for user_id in dict.fromkeys(user_ids):
+        snapshot = db.collection(User.COLLECTION).document(user_id).get()
+        data = snapshot.to_dict() if snapshot.exists else None
+        names[user_id] = (data or {}).get("display_name") or "someone"
+    return names
+
+
 def _claimant_names(user_ids: list[str]) -> list[str]:
     """Display names for the people who claimed an item, in the order given."""
     db = get_db()

@@ -4,3 +4,7 @@ tsconfig.tsbuildinfo
 
 # Screenshots from verify.mjs — regenerate them, don't commit them.
 verify-*.png
+
+# Full-resolution Ideogram originals. The optimized greyscale JPEGs in
+# public/brand/ are what ship; these are ~11MB and only needed to re-export.
+brand-source/

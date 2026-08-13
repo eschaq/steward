@@ -31,6 +31,7 @@ Usage:
     .venv/bin/python seed_demo_items.py
 """
 
+import asyncio
 import sys
 from datetime import datetime, timedelta, timezone
 
@@ -307,7 +308,11 @@ def clear_previous(db) -> int:
     use generated ids, which is exactly why they do.
     """
     removed = 0
-    for item_id in list(CLAIMS) + list(RESOLUTIONS):
+    # Every demo item, not just the ones this script gives claims to. Re-seeding
+    # resets each item's status, so a claim left behind on an item that is now
+    # `unclaimed` again would be a claim with no status behind it — the same
+    # incoherence this script exists to avoid, in the other direction.
+    for item_id in [record.id for record in ITEMS]:
         for snapshot in (
             db.collection(Claim.COLLECTION)
             .where(filter=FieldFilter("item_id", "==", item_id))
@@ -402,9 +407,30 @@ def main() -> int:
         )
         print(f"  resolved  {item_id:<26} {kind.value}")
 
+    # Let the real agent speak about the items whose status calls for it. These
+    # are genuine agent behaviours through the ADK tools, not seeded text: the
+    # mediation names the actual claimants, and the clarifying questions come
+    # from the same copy the classifier path uses. Without this the demo's
+    # contested items would be contested with nobody having said anything.
+    print()
+    from agent import AgentError, run_behavior_for_item
+
+    spoken = 0
+    for record in ITEMS:
+        if record.status not in (ItemStatus.CONTESTED, ItemStatus.NEEDS_CLARIFICATION):
+            continue
+        try:
+            result = asyncio.run(run_behavior_for_item(record.id))
+        except AgentError as exc:
+            print(f"  agent     {record.id:<26} skipped — {exc}")
+            continue
+        print(f"  agent     {record.id:<26} {result['behavior']} -> {result['status']}")
+        spoken += 1
+
     print(f"\n{len(ITEMS)} items seeded — " + ", ".join(
         f"{count} {status}" for status, count in sorted(tally.items())
     ))
+    print(f"{spoken} item(s) have a real agent message in their thread.")
     print(
         "\nHand-seeded, not agent-classified: every ai_* value above was written "
         "by hand.\nNothing here went through classify.py. The `demo-` id prefix is "

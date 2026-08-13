@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Steward — sign-in, light mode</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400..700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --surface:#fff8f4; --surface-low:#fcf2ea; --surface-mid:#f6ece5; --surface-high:#f1e6df;
+    --on-surface:#1f1b17; --on-surface-variant:#54433e; --outline:#87736d; --outline-variant:#d9c1ba;
+    --hairline:rgba(135,115,109,.18);
+    --primary:#8e4831; --primary-hover:#74341e; --clay-tint:#ffdbd0;
+    --sage:#d7e8c8; --sage-outline:#bbccad;
+    --serif:"Source Serif 4",Georgia,serif; --sans:"Work Sans",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#e7ded6;font-family:var(--sans);color:var(--on-surface);padding:44px 40px 64px}
+  .caption{font:600 11px/1.4 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:#6d5c56;margin:0 0 4px}
+  .sub{font:400 12.5px/1.6 var(--sans);color:rgba(31,27,23,.6);margin:0 0 16px;max-width:44ch}
+  .row{display:flex;gap:44px;align-items:flex-start;flex-wrap:wrap}
+  h1.page{font:600 22px/1.3 var(--serif);margin:0 0 6px}
+  p.page{font:400 13.5px/1.65 var(--sans);color:rgba(31,27,23,.65);max-width:86ch;margin:0 0 34px}
+  hr.sep{border:none;border-top:1px solid rgba(0,0,0,.09);margin:44px 0 34px}
+
+  /* --- phone frame --- */
+  .phone{width:402px;height:874px;border-radius:48px;overflow:hidden;position:relative;
+    background:#000;box-shadow:0 30px 60px rgba(0,0,0,.16),0 0 0 1px rgba(0,0,0,.12)}
+  .island{position:absolute;top:11px;left:50%;transform:translateX(-50%);width:126px;height:37px;
+    border-radius:24px;background:#000;z-index:50}
+  .statusbar{position:absolute;top:0;left:0;right:0;height:60px;z-index:40;display:flex;
+    align-items:center;justify-content:space-between;padding:19px 32px 0;
+    font:590 17px/22px -apple-system,"SF Pro",system-ui;color:#000}
+  .bars{display:flex;gap:5px;align-items:flex-end;height:12px}
+  .bars i{display:block;width:3px;background:#000;border-radius:1px}
+  .home-ind{position:absolute;bottom:9px;left:50%;transform:translateX(-50%);width:139px;height:5px;
+    border-radius:100px;background:rgba(0,0,0,.25);z-index:60}
+  .screen{position:absolute;inset:0;background:var(--surface);padding-top:60px;overflow:hidden}
+
+  /* --- the sign-in itself --- */
+  .signin{height:100%;display:flex;flex-direction:column;padding:0 22px 34px}
+  .plate{height:268px;border-radius:20px;overflow:hidden;position:relative;flex:none;margin-top:6px}
+
+  /* A — line-drawn hearth */
+  .plate--art{background:
+      radial-gradient(120% 100% at 18% 6%, rgba(255,219,208,.95) 0%, rgba(252,242,234,0) 62%),
+      radial-gradient(110% 90% at 92% 100%, rgba(215,232,200,.65) 0%, rgba(252,242,234,0) 58%),
+      linear-gradient(170deg,#fdf4ec 0%,#f4e7dd 100%);
+    display:grid;place-items:center}
+  /* B — tonal wash only */
+  .plate--wash{background:
+      radial-gradient(130% 105% at 22% 0%, rgba(255,219,208,.9) 0%, rgba(250,240,232,0) 60%),
+      radial-gradient(120% 95% at 95% 100%, rgba(187,204,173,.55) 0%, rgba(250,240,232,0) 55%),
+      linear-gradient(165deg,#fbf1e9 0%,#efe2d6 100%)}
+  .plate--wash::after{content:"";position:absolute;inset:0;
+    background:linear-gradient(180deg,rgba(255,248,244,0) 60%,rgba(255,248,244,.55) 100%)}
+
+  .wordmark{font:600 20px/1 var(--serif);color:var(--primary);letter-spacing:.01em;margin:26px 0 0}
+  .headline{font:600 34px/1.15 var(--serif);letter-spacing:-.015em;margin:12px 0 0;color:var(--on-surface)}
+  .under{font:400 15px/1.6 var(--sans);color:var(--on-surface-variant);margin:10px 0 0;max-width:30ch}
+
+  .form{margin-top:26px;display:flex;flex-direction:column;gap:14px}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field label{font:500 13.5px/1.3 var(--sans);color:var(--on-surface-variant)}
+  .field input{font:400 16px/1 var(--sans);height:52px;padding:0 16px;color:var(--on-surface);
+    background:var(--surface-low);border:1px solid var(--outline-variant);border-radius:14px}
+  .field input::placeholder{color:#a9958e}
+  .forgot{align-self:flex-end;font:500 13.5px/1 var(--sans);color:var(--primary);
+    text-decoration:none;margin-top:-2px}
+  .signin-btn{height:56px;border:none;border-radius:999px;background:var(--primary);color:#fff;
+    font:600 16px/1 var(--sans);cursor:pointer;margin-top:8px;width:100%}
+  .foot{margin-top:auto;text-align:center;font:400 13px/1.6 var(--sans);color:var(--outline)}
+  .foot a{color:var(--primary);text-decoration:none;font-weight:500}
+
+  /* --- desktop --- */
+  .desktop{width:1120px;height:760px;border-radius:14px;overflow:hidden;background:var(--surface);
+    box-shadow:0 24px 60px rgba(0,0,0,.14),0 0 0 1px rgba(0,0,0,.10);position:relative}
+  .desktop .chrome{height:38px;background:var(--surface-mid);border-bottom:1px solid var(--hairline);
+    display:flex;align-items:center;gap:7px;padding:0 14px}
+  .desktop .chrome i{width:11px;height:11px;border-radius:50%;background:#d9c1ba;display:block}
+  .dwrap{height:calc(100% - 38px);display:grid;place-items:center;padding:24px}
+  .dcard{width:452px;display:flex;flex-direction:column}
+  .dcard .plate{height:180px;border-radius:20px;margin-top:0}
+  .dcard .wordmark{margin-top:20px}
+  .dcard .headline{font-size:30px;margin-top:8px}
+  .dcard .under{font-size:14.5px;margin-top:8px;max-width:38ch}
+  .dcard .form{margin-top:20px;gap:12px}
+</style>
+</head>
+<body>
+
+<h1 class="page">Steward — sign-in, light mode</h1>
+<p class="page">Single warm column, phone-first: photo plate, wordmark, serif welcome, plainly-labelled fields, one clay pill. The two options differ only in what fills the plate — see the note under each. Everything else is identical.</p>
+
+<div class="row">
+
+  <!-- ============ OPTION A ============ -->
+  <div>
+    <p class="caption">Option A — line-drawn hearth</p>
+    <p class="sub">Commissioned line art on a warm wash. On-brand (it's the logo brief: terracotta line on cream, a house and a connecting thread), and honest — it isn't pretending to be anyone's home.</p>
+    <div class="phone">
+      <div class="island"></div>
+      <div class="statusbar"><span>9:41</span>
+        <span class="bars"><i style="height:5px"></i><i style="height:7px"></i><i style="height:9.5px"></i><i style="height:12px"></i></span>
+      </div>
+      <div class="screen">
+        <div class="signin">
+          <div class="plate plate--art">
+            <svg width="212" height="160" viewBox="0 0 212 160" fill="none" aria-hidden="true">
+              <g stroke="#8e4831" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M34 82 L106 30 L178 82" opacity=".95"/>
+                <path d="M50 74 V128 H162 V74" opacity=".95"/>
+                <path d="M50 128 H162" opacity=".95"/>
+                <path d="M92 128 V96 H120 V128" opacity=".8"/>
+                <path d="M134 52 V38 H144 V57" opacity=".7"/>
+              </g>
+              <path d="M22 140 C 62 128, 150 128, 190 140" stroke="#8e4831" stroke-width="1.2"
+                    stroke-linecap="round" opacity=".38" fill="none"/>
+              <circle cx="22" cy="140" r="3.2" fill="#8e4831" opacity=".55"/>
+              <circle cx="190" cy="140" r="3.2" fill="#8e4831" opacity=".55"/>
+              <path d="M106 30 V16" stroke="#8e4831" stroke-width="1.4" stroke-linecap="round" opacity=".4"/>
+            </svg>
+          </div>
+
+          <div class="wordmark">Steward</div>
+          <h2 class="headline">Welcome back,<br>take your time.</h2>
+          <p class="under">The house will be exactly where you left it.</p>
+
+          <form class="form" onsubmit="return false">
+            <div class="field">
+              <label for="a-email">Email</label>
+              <input id="a-email" type="email" value="ruth@thewillowhouse.family">
+            </div>
+            <div class="field">
+              <label for="a-pw">Password</label>
+              <input id="a-pw" type="password" value="somethinglong">
+            </div>
+            <a class="forgot" href="#">Forgot password?</a>
+            <button class="signin-btn" type="submit">Sign in</button>
+          </form>
+
+          <p class="foot">Invited to an estate?<br><a href="#">Use the link in your invitation.</a></p>
+        </div>
+      </div>
+      <div class="home-ind"></div>
+    </div>
+  </div>
+
+  <!-- ============ OPTION B ============ -->
+  <div>
+    <p class="caption">Option B — tonal wash, no motif</p>
+    <p class="sub">Just light and colour: clay warming one corner, sage the other. Quieter and cheaper to ship; also the one that survives untouched when a real estate photo eventually goes in that slot post-auth.</p>
+    <div class="phone">
+      <div class="island"></div>
+      <div class="statusbar"><span>9:41</span>
+        <span class="bars"><i style="height:5px"></i><i style="height:7px"></i><i style="height:9.5px"></i><i style="height:12px"></i></span>
+      </div>
+      <div class="screen">
+        <div class="signin">
+          <div class="plate plate--wash"></div>
+
+          <div class="wordmark">Steward</div>
+          <h2 class="headline">Welcome back,<br>take your time.</h2>
+          <p class="under">The house will be exactly where you left it.</p>
+
+          <form class="form" onsubmit="return false">
+            <div class="field">
+              <label for="b-email">Email</label>
+              <input id="b-email" type="email" value="ruth@thewillowhouse.family">
+            </div>
+            <div class="field">
+              <label for="b-pw">Password</label>
+              <input id="b-pw" type="password" value="somethinglong">
+            </div>
+            <a class="forgot" href="#">Forgot password?</a>
+            <button class="signin-btn" type="submit">Sign in</button>
+          </form>
+
+          <p class="foot">Invited to an estate?<br><a href="#">Use the link in your invitation.</a></p>
+        </div>
+      </div>
+      <div class="home-ind"></div>
+    </div>
+  </div>
+
+</div>
+
+<hr class="sep">
+
+<p class="caption">The same screen on a wide browser</p>
+<p class="sub">The app is a web app — this is what it becomes at desktop width. It stays one centred column rather than reflowing into a split panel; widening it is what made the old one feel like a product landing page.</p>
+
+<div class="desktop">
+  <div class="chrome"><i></i><i></i><i></i></div>
+  <div class="dwrap">
+    <div class="dcard">
+      <div class="plate plate--art">
+        <svg width="176" height="128" viewBox="0 0 212 160" fill="none" aria-hidden="true">
+          <g stroke="#8e4831" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M34 82 L106 30 L178 82" opacity=".95"/>
+            <path d="M50 74 V128 H162 V74" opacity=".95"/>
+            <path d="M50 128 H162" opacity=".95"/>
+            <path d="M92 128 V96 H120 V128" opacity=".8"/>
+            <path d="M134 52 V38 H144 V57" opacity=".7"/>
+          </g>
+          <path d="M22 140 C 62 128, 150 128, 190 140" stroke="#8e4831" stroke-width="1.2"
+                stroke-linecap="round" opacity=".38" fill="none"/>
+          <circle cx="22" cy="140" r="3.2" fill="#8e4831" opacity=".55"/>
+          <circle cx="190" cy="140" r="3.2" fill="#8e4831" opacity=".55"/>
+          <path d="M106 30 V16" stroke="#8e4831" stroke-width="1.4" stroke-linecap="round" opacity=".4"/>
+        </svg>
+      </div>
+      <div class="wordmark">Steward</div>
+      <h2 class="headline">Welcome back,<br>take your time.</h2>
+      <p class="under">The house will be exactly where you left it.</p>
+      <form class="form" onsubmit="return false">
+        <div class="field">
+          <label for="d-email">Email</label>
+          <input id="d-email" type="email" value="ruth@thewillowhouse.family">
+        </div>
+        <div class="field">
+          <label for="d-pw">Password</label>
+          <input id="d-pw" type="password" value="somethinglong">
+        </div>
+        <a class="forgot" href="#">Forgot password?</a>
+        <button class="signin-btn" type="submit">Sign in</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

@@ -149,6 +149,9 @@ The equality assertions compare against `messages.py`'s own copy functions, so
 | `POST /estates/{id}/invite`           | executor                   | `invite_to_estate`             |
 | `POST /estates/{id}/accept`           | the invitee themselves     | `accept_invite`                |
 | `GET  /estates/{id}/items`            | any accepted member        | `list_items_for_estate`        |
+| `GET  /items/{id}`                    | any accepted member        | `get_item`                     |
+| `GET  /items/{id}/messages`           | any accepted member        | `get_messages_for_item`        |
+| `GET  /items/{id}/claims`             | any accepted member        | `get_claims_for_item`          |
 | `POST /items/{id}/claim`              | any accepted member        | `record_claim`                 |
 | `POST /items/{id}/resolve`            | executor                   | `resolve_item`                 |
 | `POST /items/{id}/disposition`        | executor                   | `record_disposition_decision`  |
@@ -164,6 +167,16 @@ Handlers annotate `uid: CallerUid` — there is no user id in any request body, 
 a caller can only ever act as themselves. `verify_id_token` runs with
 `clock_skew_seconds=30`: a second of drift between this host and Google's clock
 is ordinary and shouldn't read as a forged token.
+
+The claims list is readable by any accepted member, not just the executor: a
+family cannot talk a contested piece through if only one person can see who
+wants it. It returns both `count` (documents, duplicates included) and
+`claimant_count` (distinct people) — the second is what drives the item's status.
+
+The message thread and the claims list both resolve display names server-side. `firestore.rules`
+lets a caller read their own `users` document and nothing else, so a feed
+rendered client-side would show bare uids — resolved here rather than by
+widening that rule.
 
 ### Authorization is not in the route layer
 

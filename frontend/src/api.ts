@@ -6,7 +6,12 @@
  */
 
 import { auth, API_BASE_URL } from './firebase'
-import type { ItemListResponse } from './types'
+import type {
+  ClaimListResponse,
+  Item,
+  ItemListResponse,
+  MessageListResponse,
+} from './types'
 
 export class ApiError extends Error {
   constructor(readonly status: number, message: string) {
@@ -14,7 +19,10 @@ export class ApiError extends Error {
   }
 }
 
-async function authorizedFetch(path: string): Promise<Response> {
+async function authorizedFetch(
+  path: string,
+  init?: { method?: string; body?: unknown },
+): Promise<Response> {
   const user = auth.currentUser
   if (!user) throw new ApiError(401, 'You are signed out. Sign in again to continue.')
 
@@ -23,7 +31,12 @@ async function authorizedFetch(path: string): Promise<Response> {
   let response: Response
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
-      headers: { Authorization: `Bearer ${token}` },
+      method: init?.method ?? 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+      },
+      body: init?.body ? JSON.stringify(init.body) : undefined,
     })
   } catch {
     // A dead backend is the likeliest cause in local development, and a blank
@@ -49,4 +62,28 @@ async function authorizedFetch(path: string): Promise<Response> {
 export async function fetchEstateItems(estateId: string): Promise<ItemListResponse> {
   const response = await authorizedFetch(`/estates/${encodeURIComponent(estateId)}/items`)
   return (await response.json()) as ItemListResponse
+}
+
+export async function fetchItem(itemId: string): Promise<Item> {
+  const response = await authorizedFetch(`/items/${encodeURIComponent(itemId)}`)
+  return (await response.json()) as Item
+}
+
+export async function fetchItemMessages(itemId: string): Promise<MessageListResponse> {
+  const response = await authorizedFetch(`/items/${encodeURIComponent(itemId)}/messages`)
+  return (await response.json()) as MessageListResponse
+}
+
+export async function fetchItemClaims(itemId: string): Promise<ClaimListResponse> {
+  const response = await authorizedFetch(`/items/${encodeURIComponent(itemId)}/claims`)
+  return (await response.json()) as ClaimListResponse
+}
+
+/** Put the signed-in member's name forward. The claimant is the caller — there
+ * is no user id in the body to forge. */
+export async function claimItem(itemId: string, comment?: string): Promise<void> {
+  await authorizedFetch(`/items/${encodeURIComponent(itemId)}/claim`, {
+    method: 'POST',
+    body: { comment: comment?.trim() || null },
+  })
 }

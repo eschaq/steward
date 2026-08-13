@@ -31,17 +31,20 @@ await page.goto(APP, { waitUntil: 'networkidle' })
 
 // --- sign in ---------------------------------------------------------------
 await page.waitForSelector('#email', { timeout: 15000 })
+await page.waitForTimeout(600) // let webfonts settle before the screenshot
 console.log('sign-in screen rendered')
+await page.screenshot({ path: 'verify-signin.png', fullPage: false })
 await page.fill('#email', EMAIL)
 await page.fill('#password', PASSWORD)
 await page.click('button[type=submit]')
 
 // --- dashboard -------------------------------------------------------------
-await page.waitForSelector('.app-bar__brand', { timeout: 30000 })
-await page.waitForFunction(
-  () => !document.body.innerText.includes('Loading the inventory'),
-  { timeout: 30000 },
-)
+await page.waitForSelector('.hero', { timeout: 30000 })
+// Wait for the load to actually resolve — a card, an empty state, or a stated
+// problem. Waiting on the absence of loading copy is fragile: it passes the
+// instant that wording changes.
+await page.waitForSelector('.card, .empty, .notice--problem', { timeout: 30000 })
+await page.waitForTimeout(400)
 
 const problem = await page.locator('.notice--problem').first()
 if (await problem.count()) {
@@ -51,22 +54,25 @@ if (await problem.count()) {
 const summary = await page.evaluate(() => {
   const text = (el) => el?.textContent?.trim() ?? ''
   return {
-    signedInAs: text(document.querySelector('.app-bar__email')),
-    heading: text(document.querySelector('.headline-lg')),
-    blurb: text(document.querySelector('.page > p')),
+    signedInAs: text(document.querySelector('.hero__email')),
+    heading: text(document.querySelector('.hero__title')),
+    blurb: [...document.querySelectorAll('.hero__marks .tag')].map((t) => t.textContent.trim()).join(' / '),
     filters: [...document.querySelectorAll('.filter')].map((b) =>
       b.textContent.replace(/\s+/g, ' ').trim(),
     ),
     cardCount: document.querySelectorAll('.card').length,
-    chips: [...document.querySelectorAll('.card .chip')].reduce((tally, chip) => {
-      const key = chip.className.replace('chip chip--', '')
+    ledger: [...document.querySelectorAll('.ledger__block')].map((b) =>
+      b.textContent.replace(/\s+/g, ' ').trim(),
+    ),
+    chips: [...document.querySelectorAll('.card__chip .tag')].reduce((tally, chip) => {
+      const key = chip.className.replace('tag tag--', '')
       tally[key] = (tally[key] ?? 0) + 1
       return tally
     }, {}),
     firstCards: [...document.querySelectorAll('.card')].slice(0, 4).map((card) => ({
       category: text(card.querySelector('.card__category')),
       title: text(card.querySelector('.card__title')),
-      status: text(card.querySelector('.chip')),
+      status: text(card.querySelector('.card__chip .tag')),
     })),
   }
 })
@@ -74,7 +80,8 @@ const summary = await page.evaluate(() => {
 console.log('\n--- dashboard ---')
 console.log('signed in as :', summary.signedInAs)
 console.log('heading      :', summary.heading)
-console.log('blurb        :', summary.blurb)
+console.log('marks        :', summary.blurb)
+console.log('ledger       :', summary.ledger.join('  |  '))
 console.log('filters      :', summary.filters.join('  |  '))
 console.log('cards        :', summary.cardCount)
 console.log('badges       :', JSON.stringify(summary.chips))
@@ -86,15 +93,15 @@ for (const card of summary.firstCards) {
 await page.screenshot({ path: 'verify-dashboard.png', fullPage: false })
 
 // --- a filter tab actually filters -----------------------------------------
-const contested = page.locator('.filter', { hasText: 'Contested' }).first()
+const contested = page.locator('.filter', { hasText: 'Needs a talk' }).first()
 await contested.click()
 await page.waitForTimeout(300)
 const afterFilter = await page.evaluate(() => ({
   cards: document.querySelectorAll('.card').length,
-  statuses: [...new Set([...document.querySelectorAll('.card .chip')].map((c) => c.textContent.trim()))],
+  statuses: [...new Set([...document.querySelectorAll('.card__chip .tag')].map((c) => c.textContent.trim()))],
   empty: document.querySelector('.empty')?.textContent?.trim() ?? null,
 }))
-console.log('\n--- Contested filter ---')
+console.log('\n--- Needs a talk filter ---')
 console.log('cards        :', afterFilter.cards)
 console.log('statuses     :', afterFilter.statuses.join(', ') || '(none)')
 if (afterFilter.empty) console.log('empty state  :', afterFilter.empty)

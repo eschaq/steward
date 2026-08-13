@@ -19,6 +19,7 @@ This is the same mapping the frontend service will rely on; it never touches
 Firestore directly (CLAUDE.md's trust boundary).
 """
 
+from datetime import datetime
 from typing import Optional
 
 import os
@@ -29,9 +30,10 @@ from pydantic import BaseModel, Field
 
 from agent import AgentError, run_behavior_for_item
 from auth_deps import CallerUid
-from claims import ClaimError, record_claim
+from claims import ClaimError, get_claims_for_item, record_claim
 from dispositions import DispositionError, record_disposition_decision
 from items import get_item, list_items_for_estate
+from messages import AGENT_USER_ID, display_names_for, get_messages_for_item
 from membership import (
     MembershipError,
     MembershipRole,
@@ -83,6 +85,21 @@ def _load_item(item_id: str) -> Item:
     if item is None:
         raise HTTPException(status_code=404, detail=f"No item {item_id}.")
     return item
+
+
+def _summary(item: Item) -> "ItemSummary":
+    """One item's wire shape. Shared so the list and the detail never diverge."""
+    return ItemSummary(
+        id=item.id,
+        estate_id=item.estate_id,
+        ai_category=item.ai_category,
+        ai_condition_notes=item.ai_condition_notes,
+        ai_est_era_or_brand=item.ai_est_era_or_brand,
+        ai_classification_confidence=item.ai_classification_confidence,
+        suggested_disposition=item.suggested_disposition.value,
+        status=item.status.value,
+        photo_urls=item.photo_urls,
+    )
 
 
 def _forbidden(exc: MembershipError) -> HTTPException:
@@ -161,6 +178,45 @@ class ItemSummary(BaseModel):
     suggested_disposition: str
     status: str
     photo_urls: list[str] = Field(default_factory=list)
+
+
+class MessageResponse(BaseModel):
+    id: str
+    item_id: Optional[str] = None
+    user_id: str
+    # Resolved server-side: the frontend cannot read `users`.
+    author_name: str
+    # Lets the UI give Steward its own voice without hardcoding a uid.
+    is_agent: bool
+    text: str
+    created_at: datetime
+
+
+class ClaimantResponse(BaseModel):
+    claim_id: str
+    user_id: str
+    # Resolved server-side: the frontend cannot read `users`.
+    claimant_name: str
+    # So the page can say "You" rather than the reader's own display name.
+    is_you: bool
+    comment: Optional[str] = None
+    claimed_at: datetime
+
+
+class ClaimListResponse(BaseModel):
+    item_id: str
+    # Documents, duplicates included — the collection has no uniqueness
+    # constraint by design.
+    count: int
+    # How many *different* people. This is what drives the item's status.
+    claimant_count: int
+    claims: list[ClaimantResponse]
+
+
+class MessageListResponse(BaseModel):
+    item_id: str
+    count: int
+    messages: list[MessageResponse]
 
 
 class ItemListResponse(BaseModel):
@@ -249,19 +305,83 @@ def get_estate_items(estate_id: str, uid: CallerUid) -> ItemListResponse:
     return ItemListResponse(
         estate_id=estate_id,
         count=len(items),
-        items=[
-            ItemSummary(
-                id=item.id,
-                estate_id=item.estate_id,
-                ai_category=item.ai_category,
-                ai_condition_notes=item.ai_condition_notes,
-                ai_est_era_or_brand=item.ai_est_era_or_brand,
-                ai_classification_confidence=item.ai_classification_confidence,
-                suggested_disposition=item.suggested_disposition.value,
-                status=item.status.value,
-                photo_urls=item.photo_urls,
+        items=[_summary(item) for item in items],
+    )
+
+
+@app.get("/items/{item_id}", response_model=ItemSummary)
+def get_one_item(item_id: str, uid: CallerUid) -> ItemSummary:
+    """One item. Any accepted member of its estate."""
+    item = _load_item(item_id)
+    try:
+        require_role(uid, item.estate_id)
+    except MembershipError as exc:
+        raise _forbidden(exc) from exc
+    return _summary(item)
+
+
+@app.get("/items/{item_id}/messages", response_model=MessageListResponse)
+def get_item_messages(item_id: str, uid: CallerUid) -> MessageListResponse:
+    """The message thread for one item, oldest first.
+
+    Item-specific slice of the single unified feed — the data model keeps
+    general estate discussion in the same collection with a null item_id.
+    """
+    item = _load_item(item_id)
+    try:
+        require_role(uid, item.estate_id)
+    except MembershipError as exc:
+        raise _forbidden(exc) from exc
+
+    thread = get_messages_for_item(item_id)
+    names = display_names_for([m.user_id for m in thread])
+    return MessageListResponse(
+        item_id=item_id,
+        count=len(thread),
+        messages=[
+            MessageResponse(
+                id=m.id,
+                item_id=m.item_id,
+                user_id=m.user_id,
+                author_name=names.get(m.user_id, "someone"),
+                is_agent=m.user_id == AGENT_USER_ID,
+                text=m.text,
+                created_at=m.created_at,
             )
-            for item in items
+            for m in thread
+        ],
+    )
+
+
+@app.get("/items/{item_id}/claims", response_model=ClaimListResponse)
+def get_item_claims(item_id: str, uid: CallerUid) -> ClaimListResponse:
+    """Who has asked for this item, oldest first, with what they said.
+
+    Visible to any accepted member: a family cannot talk through a contested
+    piece if only the executor can see who wants it.
+    """
+    item = _load_item(item_id)
+    try:
+        require_role(uid, item.estate_id)
+    except MembershipError as exc:
+        raise _forbidden(exc) from exc
+
+    claims = get_claims_for_item(item_id)
+    names = display_names_for([c.user_id for c in claims])
+    return ClaimListResponse(
+        item_id=item_id,
+        count=len(claims),
+        claimant_count=len({c.user_id for c in claims}),
+        claims=[
+            ClaimantResponse(
+                claim_id=c.id,
+                user_id=c.user_id,
+                claimant_name=names.get(c.user_id, "someone"),
+                is_you=c.user_id == uid,
+                comment=c.comment,
+                claimed_at=c.claimed_at,
+            )
+            for c in claims
         ],
     )
 
