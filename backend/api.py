@@ -21,7 +21,10 @@ Firestore directly (CLAUDE.md's trust boundary).
 
 from typing import Optional
 
+import os
+
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from agent import AgentError, run_behavior_for_item
@@ -43,6 +46,26 @@ from resolutions import ResolutionError, resolve_item
 app = FastAPI(
     title="Steward",
     description="Estate belongings disposition — backend API.",
+)
+
+# The frontend is a separate Cloud Run service, so every browser call is
+# cross-origin. An explicit allow-list, not "*": credentials ride on the
+# Authorization header, and a wildcard would let any page on the internet make
+# authenticated calls on a signed-in user's behalf. Set STEWARD_ALLOWED_ORIGINS
+# (comma-separated) to the frontend's URL when it is deployed.
+ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get(
+        "STEWARD_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174"
+    ).split(",")
+    if origin.strip()
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 

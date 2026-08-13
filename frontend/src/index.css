@@ -1,0 +1,526 @@
+/* Steward's design system, from docs/design/steward/DESIGN.md.
+ *
+ * Written as plain CSS with custom properties rather than Tailwind: the tokens
+ * are already fully specified there, and a stylesheet keeps them in one readable
+ * place without a build-time config to drift from the source of truth.
+ *
+ * The brand rules out a lot on purpose (CLAUDE.md): no urgency, no countdowns,
+ * no gamification, no shadows. Depth is tonal layering and ghost borders only.
+ */
+
+:root {
+  /* Surfaces — warm cream, never stark white for the page itself. */
+  --surface: #fff8f4;
+  --surface-container-lowest: #ffffff;
+  --surface-container-low: #fcf2ea;
+  --surface-container: #f6ece5;
+  --surface-container-high: #f1e6df;
+  --surface-container-highest: #ebe1da;
+
+  --on-surface: #1f1b17;
+  --on-surface-variant: #54433e;
+  --outline: #87736d;
+  --outline-variant: #d9c1ba;
+
+  /* Warm clay. */
+  --primary: #8e4831;
+  --on-primary: #ffffff;
+  --primary-container: #ac6046;
+  --primary-fixed: #ffdbd0;
+  --on-primary-fixed-variant: #74341e;
+
+  /* Soft sage. */
+  --secondary: #54634a;
+  --secondary-container: #d7e8c8;
+  --on-secondary-container: #5a6950;
+  --secondary-fixed-dim: #bbccad;
+  --on-secondary-fixed-variant: #3d4b34;
+
+  --tertiary: #645b4b;
+  --tertiary-fixed: #efe1cc;
+  --on-tertiary-fixed-variant: #4e4637;
+
+  --error: #ba1a1a;
+  --error-container: #ffdad6;
+  --on-error-container: #93000a;
+
+  /* Depth is a ghost border, not a shadow. */
+  --ghost-border: 1px solid rgba(135, 115, 109, 0.15);
+
+  /* 8px rhythm. */
+  --unit: 8px;
+  --element-gap: 16px;
+  --gutter: 24px;
+  --section-gap: 64px;
+  --margin-mobile: 20px;
+  --container-max: 1120px;
+
+  /* Soft, never sharp. 4px for controls, 8px for cards and photos. */
+  --radius: 4px;
+  --radius-lg: 8px;
+
+  --serif: "Source Serif 4", Georgia, serif;
+  --sans: "Work Sans", system-ui, -apple-system, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--on-surface);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 24px;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--serif);
+  margin: 0;
+}
+
+/* --- type scale ---------------------------------------------------------- */
+
+.display-lg {
+  font-family: var(--serif);
+  font-size: 42px;
+  line-height: 52px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.headline-lg {
+  font-family: var(--serif);
+  font-size: 32px;
+  line-height: 40px;
+  font-weight: 600;
+}
+.headline-md {
+  font-family: var(--serif);
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 500;
+}
+.body-lg {
+  font-size: 18px;
+  line-height: 28px;
+}
+.body-md {
+  font-size: 16px;
+  line-height: 24px;
+}
+.label-md {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+.label-sm {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+/* --- app shell ----------------------------------------------------------- */
+
+.app-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--surface);
+  border-bottom: var(--ghost-border);
+}
+
+.app-bar__inner {
+  max-width: var(--container-max);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--element-gap);
+}
+
+.app-bar__brand {
+  font-family: var(--serif);
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 500;
+  color: var(--primary);
+}
+
+.app-bar__who {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--on-surface-variant);
+  min-width: 0;
+}
+
+.app-bar__email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 30ch;
+}
+
+.page {
+  max-width: var(--container-max);
+  margin: 0 auto;
+  padding: 32px var(--gutter) var(--section-gap);
+}
+
+@media (max-width: 640px) {
+  .app-bar__inner,
+  .page {
+    padding-left: var(--margin-mobile);
+    padding-right: var(--margin-mobile);
+  }
+  .app-bar__email {
+    max-width: 14ch;
+  }
+}
+
+/* --- controls ------------------------------------------------------------ */
+
+.button {
+  font-family: var(--sans);
+  font-size: 16px;
+  font-weight: 500;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  padding: 12px 20px;
+  cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.button--primary {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+.button--primary:hover:not(:disabled) {
+  background: var(--on-primary-fixed-variant);
+}
+.button--primary:disabled {
+  background: var(--surface-container-highest);
+  color: var(--on-surface-variant);
+  cursor: default;
+}
+
+.button--quiet {
+  background: transparent;
+  color: var(--on-surface-variant);
+  border-color: var(--secondary-fixed-dim);
+  padding: 8px 14px;
+  font-size: 14px;
+}
+.button--quiet:hover {
+  background: rgba(215, 232, 200, 0.35);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field label {
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--on-surface-variant);
+}
+
+.field input {
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 24px;
+  padding: 12px 14px;
+  color: var(--on-surface);
+  background: var(--surface-container-low);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius);
+}
+
+.field input:focus {
+  outline: 2px solid var(--primary-container);
+  outline-offset: 1px;
+}
+
+/* --- sign in ------------------------------------------------------------- */
+
+.signin {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: var(--gutter);
+}
+
+.signin__card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--surface-container-lowest);
+  border: var(--ghost-border);
+  border-radius: var(--radius-lg);
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gutter);
+}
+
+.signin__brand {
+  font-family: var(--serif);
+  font-size: 42px;
+  line-height: 52px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--primary);
+}
+
+.signin__tagline {
+  color: var(--on-surface-variant);
+  margin: 4px 0 0;
+}
+
+.signin__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--element-gap);
+}
+
+/* --- notices ------------------------------------------------------------- */
+/* Failures are stated plainly and visibly — never a silent guess. */
+
+.notice {
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  border: 1px solid var(--outline-variant);
+  background: var(--surface-container);
+  color: var(--on-surface-variant);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.notice--problem {
+  background: var(--error-container);
+  border-color: var(--error-container);
+  color: var(--on-error-container);
+}
+
+/* --- filters ------------------------------------------------------------- */
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--unit);
+  margin: var(--element-gap) 0 var(--gutter);
+}
+
+.filter {
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  padding: 8px 14px;
+  border-radius: var(--radius);
+  border: var(--ghost-border);
+  background: var(--surface-container-high);
+  color: var(--on-surface-variant);
+  cursor: pointer;
+  transition: background-color 140ms ease;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.filter:hover:not(.filter--on) {
+  background: var(--surface-container-highest);
+}
+
+.filter--on {
+  background: rgba(215, 232, 200, 0.5);
+  border-color: var(--secondary-container);
+  color: var(--on-secondary-container);
+}
+
+/* A status with nothing in it stays visible and legible — hiding it would hide
+ * a real state the data model allows. */
+.filter--empty {
+  opacity: 0.65;
+}
+
+.filter__count {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--outline);
+}
+
+.filter--on .filter__count {
+  color: var(--on-secondary-container);
+}
+
+/* --- item grid ----------------------------------------------------------- */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(288px, 1fr));
+  gap: var(--element-gap);
+}
+
+.card {
+  background: var(--surface-container-lowest);
+  border: var(--ghost-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  /* No lift on hover — a tonal shift only. */
+  transition: background-color 140ms ease;
+}
+
+.card:hover {
+  background: rgba(215, 232, 200, 0.12);
+}
+
+.card__photo {
+  position: relative;
+  height: 176px;
+  background: var(--surface-container);
+  border-bottom: var(--ghost-border);
+}
+
+.card__photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* No photo yet: a quiet tonal panel naming the category, rather than a stock
+ * photograph of somebody else's family. */
+.card__photo--empty {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: var(--element-gap);
+  color: var(--outline);
+}
+
+.card__chip {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
+.card__body {
+  padding: var(--element-gap);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.card__category {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tertiary);
+}
+
+.card__title {
+  font-family: var(--serif);
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 500;
+  color: var(--on-surface);
+}
+
+.card__notes {
+  color: var(--on-surface-variant);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.card__foot {
+  margin-top: var(--unit);
+  padding-top: 12px;
+  border-top: var(--ghost-border);
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--on-surface-variant);
+  font-size: 12px;
+  letter-spacing: 0.03em;
+}
+
+/* --- status chips -------------------------------------------------------- */
+/* Deliberately desaturated: the dashboard should not feel alarm-driven. */
+
+.chip {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.chip--unclaimed {
+  background: var(--surface-container-highest);
+  color: var(--on-surface-variant);
+  border-color: var(--outline-variant);
+}
+.chip--claimed {
+  background: var(--secondary-container);
+  color: var(--on-secondary-container);
+}
+.chip--contested {
+  background: #f2e2c4;
+  color: #7a5320;
+}
+.chip--resolved {
+  background: var(--secondary-fixed-dim);
+  color: var(--on-secondary-fixed-variant);
+}
+.chip--routed {
+  background: var(--tertiary-fixed);
+  color: var(--on-tertiary-fixed-variant);
+}
+.chip--needs_clarification {
+  background: var(--primary-fixed);
+  color: var(--on-primary-fixed-variant);
+}
+
+/* --- empty states -------------------------------------------------------- */
+
+.empty {
+  border: 1px dashed var(--outline-variant);
+  border-radius: var(--radius-lg);
+  padding: 48px var(--gutter);
+  text-align: center;
+  color: var(--on-surface-variant);
+  background: var(--surface-container-low);
+}
+
+.muted {
+  color: var(--on-surface-variant);
+}

@@ -1,0 +1,6 @@
+node_modules/
+dist/
+tsconfig.tsbuildinfo
+
+# Screenshots from verify.mjs — regenerate them, don't commit them.
+verify-*.png
