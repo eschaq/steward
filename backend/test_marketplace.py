@@ -1,11 +1,11 @@
-"""End-to-end check of Tier 2 channel recommendation, against real Firestore and
-a real Gemini call.
+"""End-to-end check of the Tier 2 listing draft, against real Firestore and a
+real Gemini call.
 
 Not a test suite — a script. Four cases:
 
   (a) A resolved item routed to sell gets a MarketplaceListing with a real
-      platform, a reason that is about *that item*, and the pricing/draft-text
-      fields left null.
+      platform, a reason and a description that are about *that item*, a usable
+      asking price, and a title that isn't shouting.
   (b) A second item in a different category gets a different, equally specific
       recommendation — the check that this is not boilerplate with a name
       swapped in.
@@ -57,6 +57,10 @@ NO_DISPOSITION_ITEM = "demo-hall-rug"
 # Words that mean the model wrote marketing copy rather than talking to a family.
 HUSTLE = ["maximis", "maximiz", "best price", "top dollar", "act fast", "don't miss",
           "buyers are waiting", "hot item", "in demand", "quick sale"]
+
+# The same, for listing copy — where the hustle sounds like an auction site.
+LISTING_HUSTLE = HUSTLE + ["must see", "must-see", "rare find", "l@@k", "grab a bargain",
+                           "won't last", "wont last", "hurry", "steal", "!!"]
 
 failures: list[str] = []
 
@@ -140,10 +144,54 @@ def main() -> int:
         check("  listing_status", stored.listing_status, ListingStatus.DRAFT)
         check("  disposition_id", stored.disposition_id, disposition.id)
         check("  platform is a real choice", stored.platform in list(Platform), True)
-        check("  suggested_price left null", stored.suggested_price, None)
-        check("  draft title left null", stored.listing_draft_title, None)
-        check("  draft description left null", stored.listing_draft_description, None)
+        # The one call fills all four. listing_url stays null — posting it
+        # somewhere is a human act, not a generated one.
+        check("  a usable asking price", isinstance(stored.suggested_price, float), True)
+        check(
+            f"  and a sane one (${stored.suggested_price})",
+            stored.suggested_price is not None and 0 <= stored.suggested_price <= 100_000,
+            True,
+        )
+        check("  a draft title", bool(stored.listing_draft_title), True)
+        check(
+            f"  short enough for a title field ({len(stored.listing_draft_title or '')} chars)",
+            len(stored.listing_draft_title or "") <= 90,
+            True,
+        )
+        check("  a draft description", bool(stored.listing_draft_description), True)
         check("  listing_url left null", stored.listing_url, None)
+
+        print(f"  price    : {stored.suggested_price}")
+        print(f"  title    : {stored.listing_draft_title}")
+        print(f"  body     : {stored.listing_draft_description}")
+
+        copy = f"{stored.listing_draft_title} {stored.listing_draft_description}".lower()
+        check(
+            "  listing copy isn't a sales pitch",
+            [word for word in LISTING_HUSTLE if word in copy],
+            [],
+        )
+        # SHOUTED words are the other tell, and one the word list misses.
+        shouted = [
+            word
+            for word in (stored.listing_draft_title or "").split()
+            if len(word) > 2 and word.isupper()
+        ]
+        check("  and isn't shouting", shouted, [])
+        # Honest about wear: the description should carry the condition, not
+        # quietly drop it. Checked the same way the reason is — overlap with the
+        # item's own distinctive words, not a demanded phrase.
+        notes = {
+            w.strip(".,;:—()'\"").lower()
+            for w in item.ai_condition_notes.split()
+            if len(w) >= 5
+        }
+        carried = sorted(w for w in notes if w and w in (stored.listing_draft_description or "").lower())
+        check(
+            f"  says what's wrong with it ({', '.join(carried[:6]) or 'nothing'})",
+            len(carried) >= 2,
+            True,
+        )
 
         reason = stored.platform_recommendation_reason
         check("  reason is a real sentence", 25 < len(reason) < 400, True)
@@ -205,8 +253,8 @@ def main() -> int:
             print(f"  - {failure}")
         return 1
 
-    print("OK — real platform choices with item-specific reasons; donate and "
-          "undecided both refused.")
+    print("OK — real platform choices, honest listing copy and a sane price; "
+          "donate and undecided both refused.")
     return 0
 
 

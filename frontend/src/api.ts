@@ -13,6 +13,9 @@ import type {
   Me,
   Message,
   MessageListResponse,
+  DispositionChoice,
+  DispositionDetail,
+  ListingDetail,
   ResolutionDetail,
   ResolutionType,
   ReviewResponse,
@@ -26,7 +29,7 @@ export class ApiError extends Error {
 
 async function authorizedFetch(
   path: string,
-  init?: { method?: string; body?: unknown },
+  init?: { method?: string; body?: unknown; form?: FormData },
 ): Promise<Response> {
   const user = auth.currentUser
   if (!user) throw new ApiError(401, 'You are signed out. Sign in again to continue.')
@@ -39,9 +42,11 @@ async function authorizedFetch(
       method: init?.method ?? 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
+        // No Content-Type for FormData — the browser sets it, and must, because
+        // it has to include the multipart boundary.
         ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
       },
-      body: init?.body ? JSON.stringify(init.body) : undefined,
+      body: init?.form ?? (init?.body ? JSON.stringify(init.body) : undefined),
     })
   } catch {
     // fetch() throws the same TypeError for a dead server and for a CORS
@@ -160,4 +165,44 @@ export async function resolveItem(
 export async function fetchReview(estateId: string): Promise<ReviewResponse> {
   const response = await authorizedFetch(`/estates/${encodeURIComponent(estateId)}/review`)
   return (await response.json()) as ReviewResponse
+}
+
+/** Attach a photograph to an item. Executor only, enforced server-side. */
+export async function uploadItemPhoto(itemId: string, file: File): Promise<Item> {
+  const form = new FormData()
+  form.append('file', file)
+  const response = await authorizedFetch(`/items/${encodeURIComponent(itemId)}/photo`, {
+    method: 'POST',
+    form,
+  })
+  return (await response.json()) as Item
+}
+
+export async function fetchItemDisposition(
+  itemId: string,
+): Promise<DispositionDetail | null> {
+  const response = await authorizedFetch(
+    `/items/${encodeURIComponent(itemId)}/disposition`,
+  )
+  return (await response.json()) as DispositionDetail | null
+}
+
+/** Record where a resolved item is headed. Executor only, enforced server-side. */
+export async function decideDisposition(
+  itemId: string,
+  choice: DispositionChoice,
+): Promise<void> {
+  await authorizedFetch(`/items/${encodeURIComponent(itemId)}/disposition`, {
+    method: 'POST',
+    body: { executor_chosen_disposition: choice },
+  })
+}
+
+/** Ask Steward where to list it. Only meaningful after a `sell` decision. */
+export async function requestListing(itemId: string): Promise<ListingDetail> {
+  const response = await authorizedFetch(
+    `/items/${encodeURIComponent(itemId)}/marketplace-listing`,
+    { method: 'POST' },
+  )
+  return (await response.json()) as ListingDetail
 }

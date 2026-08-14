@@ -1,9 +1,15 @@
-"""Tier 2: which marketplace to sell a belonging on, and why.
+"""Tier 2: which marketplace to sell a belonging on, what to ask for it, and
+how to describe it.
 
-**Channel recommendation only.** Pricing and draft listing text are separate,
-later work — `suggested_price`, `listing_draft_title` and
-`listing_draft_description` are written null, meaning "not done yet" rather than
-"none needed".
+**One Gemini call for all four**, not a channel call followed by a pricing call.
+They condition on each other: the same sideboard is worded and priced one way as
+a local Facebook collection and another way as an eBay listing to a collector,
+and a second call would be free to disagree with the first. Asking once also
+halves the latency the executor waits through, and there is no case where a
+caller wants the platform without the rest.
+
+`listing_url` stays null — that is set when someone actually posts it somewhere,
+which is a human act, not a generated one.
 
 Attaches at the Disposition seam, exactly as the data model doc describes: this
 module reads a Disposition and writes a MarketplaceListing. Nothing in Tier 1
@@ -14,7 +20,7 @@ one per module.
 """
 
 import json
-from typing import Optional
+from typing import NamedTuple, Optional
 
 from google.genai import types
 
@@ -49,35 +55,64 @@ class MarketplaceError(Exception):
 
 
 PROMPT = """A family is settling an estate and has decided to sell one of the belongings.
-Recommend where to list it.
+Work out where to list it, what to ask for it, and how to describe it.
 
 The item:
   category: {category}
   condition: {condition}
   era or brand: {era}
 
-Choose exactly one platform:
+**platform** — choose exactly one:
   vinted          — clothing, fabric, accessories; casual, low-value, easy postage
   fb_marketplace  — furniture and anything bulky or local-collection-only
   ebay            — collectables, tools, china, anything with a specialist buyer
   poshmark        — branded fashion and accessories, US-centric
   other           — none of the above genuinely fits
 
-Then give one short sentence saying why, written for the family — not for a
-reseller. Be specific to *this* item: name the thing, and the actual reason
-(weight, buyer, condition, who looks there). Warm and plainspoken. No urgency,
-no sales language, no talk of maximising returns or moving fast.
+**reason** — one short sentence on why that platform, written for the family,
+not for a reseller. Be specific to *this* item: name the thing, and the actual
+reason (weight, buyer, condition, who looks there).
 
 Good: "A bookcase this heavy is really a local-collection sale, and Facebook is
 where people near you look."
 Bad: "Maximise your resale value by listing on our recommended platform!"
 
+**suggested_price** — a plain number in US dollars, no currency symbol, no
+range. A sensible asking price on that platform for something in this condition.
+Nobody expects an appraisal — this is a starting point the executor will adjust,
+so a defensible ballpark beats a confident-sounding guess. Round to something a
+person would actually type: 15, 40, 250. If the item is genuinely worth almost
+nothing, say so with a low number rather than inflating it.
+
+**listing_draft_title** — what goes in the listing's title field, under about 70
+characters. Name the thing plainly, with the era or brand if it is real. No
+capitals for emphasis, no exclamation marks, no "RARE", no "L@@K".
+
+**listing_draft_description** — two or three short sentences the family could
+post as written. Say what it is, then say what is wrong with it. Wear, damage
+and missing pieces go in the description, not left for the buyer to find — a
+family selling their parents' things is not trying to put one over on anyone.
+Plain and unhurried. Never invent a detail that is not in the condition notes
+above; if the notes are thin, the description is short.
+
+Good: "A brass table lamp from the 1970s, rewired at some point and working. The
+shade is original and has a small tear near the seam. Collection from the house,
+or I can post it if you cover the cost."
+Bad: "STUNNING vintage brass lamp!! A RARE FIND for the discerning collector —
+won't last long at this price!"
+
 Reply with JSON only:
-{{"platform": "one of the five above", "reason": "one sentence"}}"""
+{{"platform": "one of the five above",
+  "reason": "one sentence",
+  "suggested_price": 0,
+  "listing_draft_title": "short title",
+  "listing_draft_description": "two or three sentences"}}"""
 
 
 def _response_schema() -> types.Schema:
-    """Constrain generation so the platform can only be one of the five."""
+    """Constrain generation so the platform can only be one of the five, and the
+    price comes back as a number rather than "about $40"."""
+    string = types.Schema(type=types.Type.STRING)
     return types.Schema(
         type=types.Type.OBJECT,
         properties={
@@ -85,9 +120,18 @@ def _response_schema() -> types.Schema:
                 type=types.Type.STRING,
                 enum=[platform.value for platform in Platform],
             ),
-            "reason": types.Schema(type=types.Type.STRING),
+            "reason": string,
+            "suggested_price": types.Schema(type=types.Type.NUMBER),
+            "listing_draft_title": string,
+            "listing_draft_description": string,
         },
-        required=["platform", "reason"],
+        required=[
+            "platform",
+            "reason",
+            "suggested_price",
+            "listing_draft_title",
+            "listing_draft_description",
+        ],
     )
 
 
@@ -113,12 +157,59 @@ def get_listing(disposition_id: str) -> Optional[MarketplaceListing]:
     return MarketplaceListing.model_validate(snapshot.to_dict())
 
 
-def _ask_gemini(category: str, condition: str, era: Optional[str]) -> tuple[Platform, str]:
-    """Ask for a platform and a reason. Falls back honestly, never guesses.
+class Draft(NamedTuple):
+    """Everything the one Gemini call comes back with.
 
-    A transport failure, a quota rejection or an unparseable reply all come back
-    as `other` with a plain note — the same shape classify.py uses, so a failure
-    is visible in the data rather than hidden behind a plausible-looking choice.
+    Price and the two draft-text fields stay Optional: a reply good enough to
+    name a platform but not to price the thing is worth keeping for the part it
+    got right, rather than being thrown away whole.
+    """
+
+    platform: Platform
+    reason: str
+    suggested_price: Optional[float] = None
+    listing_draft_title: Optional[str] = None
+    listing_draft_description: Optional[str] = None
+
+
+# A price the model clearly didn't mean. Not a valuation judgement — just the
+# range outside which a household belonging's asking price is a parse artefact.
+MAX_SENSIBLE_PRICE = 1_000_000.0
+
+
+def _price(value: object) -> Optional[float]:
+    """A usable asking price, or None. Never a negative or a NaN."""
+    try:
+        price = round(float(value), 2)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    if price != price or price < 0 or price > MAX_SENSIBLE_PRICE:
+        return None
+    return price
+
+
+def _text(value: object) -> Optional[str]:
+    """A non-empty string, or None — an empty draft is not a draft."""
+    text = str(value).strip() if value is not None else ""
+    return text or None
+
+
+def _failed() -> Draft:
+    """What comes back when the model could not be reached or understood.
+
+    `other` with a plain note and nothing else filled in, the same shape
+    classify.py uses: the failure is visible in the data rather than hidden
+    behind a plausible-looking recommendation.
+    """
+    return Draft(platform=Platform.OTHER, reason=RECOMMENDATION_FAILED_REASON)
+
+
+def _ask_gemini(category: str, condition: str, era: Optional[str]) -> Draft:
+    """Ask for the platform, the reason, a price and the draft text — once.
+
+    A transport failure, a quota rejection or an unparseable reply all degrade
+    the same way. A reply that parses but leaves a field unusable keeps
+    everything else and nulls only that field.
     """
     try:
         response = vertex_client().models.generate_content(
@@ -133,22 +224,26 @@ def _ask_gemini(category: str, condition: str, era: Optional[str]) -> tuple[Plat
         )
         raw = (response.text or "").strip()
     except Exception:  # noqa: BLE001 — every failure degrades the same way
-        return Platform.OTHER, RECOMMENDATION_FAILED_REASON
+        return _failed()
 
     try:
         payload, _ = json.JSONDecoder().raw_decode(raw)
         platform = Platform(payload["platform"])
-        reason = str(payload["reason"]).strip()
+        reason = _text(payload.get("reason"))
     except Exception:  # noqa: BLE001 — a malformed reply is a failed reply
-        return Platform.OTHER, RECOMMENDATION_FAILED_REASON
+        return _failed()
 
-    if not reason:
-        return platform, RECOMMENDATION_FAILED_REASON
-    return platform, reason
+    return Draft(
+        platform=platform,
+        reason=reason or RECOMMENDATION_FAILED_REASON,
+        suggested_price=_price(payload.get("suggested_price")),
+        listing_draft_title=_text(payload.get("listing_draft_title")),
+        listing_draft_description=_text(payload.get("listing_draft_description")),
+    )
 
 
 def recommend_channel(item_id: str) -> MarketplaceListing:
-    """Recommend where to sell a resolved item, and record it as a draft listing.
+    """Draft a listing for a resolved item: where, how much, and what to say.
 
     Raises MarketplaceError if the item has no disposition yet, or if the
     disposition routes somewhere other than a marketplace. Both are caller
@@ -172,19 +267,20 @@ def recommend_channel(item_id: str) -> MarketplaceListing:
     if item is None:
         raise MarketplaceError(f"No item {item_id} to recommend a channel for.")
 
-    platform, reason = _ask_gemini(
+    draft = _ask_gemini(
         item.ai_category, item.ai_condition_notes, item.ai_est_era_or_brand
     )
 
     listing = MarketplaceListing(
         id=listing_id(disposition.id),
         disposition_id=disposition.id,
-        platform=platform,
-        platform_recommendation_reason=reason,
-        # Explicitly null: this loop is channel choice only.
-        suggested_price=None,
-        listing_draft_title=None,
-        listing_draft_description=None,
+        platform=draft.platform,
+        platform_recommendation_reason=draft.reason,
+        suggested_price=draft.suggested_price,
+        listing_draft_title=draft.listing_draft_title,
+        listing_draft_description=draft.listing_draft_description,
+        # Set when someone actually posts it somewhere — a human act, not a
+        # generated one.
         listing_url=None,
         listing_status=ListingStatus.DRAFT,
     )

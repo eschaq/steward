@@ -152,18 +152,20 @@ The equality assertions compare against `messages.py`'s own copy functions, so
 | `POST /estates/{id}/invite`           | executor                   | `invite_to_estate`             |
 | `POST /estates/{id}/accept`           | the invitee themselves     | `accept_invite`                |
 | `GET  /estates/{id}/items`            | any accepted member        | `list_items_for_estate`        |
-| `GET  /estates/{id}/review`           | any accepted member        | composes items + claims + resolutions |
+| `GET  /estates/{id}/review`           | any accepted member        | composes items + claims + resolutions + dispositions |
 | `GET  /items/{id}`                    | any accepted member        | `get_item`                     |
 | `GET  /items/{id}/messages`           | any accepted member        | `get_messages_for_item`        |
 | `GET  /items/{id}/claims`             | any accepted member        | `get_claims_for_item`          |
 | `GET  /estates/{id}/me`               | any signed-in caller       | `get_membership`               |
 | `GET  /estates/{id}/messages`         | any accepted member        | `get_messages_for_estate`      |
 | `GET  /items/{id}/resolution`         | any accepted member        | `get_resolution`               |
+| `GET  /items/{id}/disposition`        | any accepted member        | `get_disposition` + its listing |
 | `POST /estates/{id}/messages`         | any accepted member        | `post_message`                 |
 | `POST /items/{id}/claim`              | any accepted member        | `record_claim`                 |
 | `POST /items/{id}/resolve`            | executor                   | `resolve_item`                 |
 | `POST /items/{id}/disposition`        | executor                   | `record_disposition_decision`  |
 | `POST /items/{id}/photo`              | executor                   | `store_item_photo`             |
+| `POST /items/{id}/marketplace-listing`| executor                   | `recommend_channel`            |
 | `POST /items/{id}/agent-message`      | any accepted member        | `run_behavior_for_item`        |
 
 ### Authentication
@@ -183,12 +185,26 @@ wants it. It returns both `count` (documents, duplicates included) and
 `claimant_count` (distinct people) — the second is what drives the item's status.
 
 `GET /estates/{id}/review` exists for one reason: the executor's review table
-needs an item's claim count and its decision alongside it, and asking per item
-turned 38 items into 76 round trips. It composes reads that already exist — no
-new entity, no new collection. Claims are fetched by chunked `in` query (30 ids
-at a time, Firestore's limit) and resolutions by their deterministic document
-ids through `get_all`, so the whole table is a handful of reads rather than one
-per row.
+needs an item's claim count, its resolution and where it is headed alongside it,
+and asking per item turned 38 items into 114 round trips. It composes reads that
+already exist — no new entity, no new collection. Claims are fetched by chunked
+`in` query (30 ids at a time, Firestore's limit); resolutions, dispositions and
+their marketplace listings by their deterministic document ids through
+`get_all`. The whole table is five reads rather than three per row.
+
+The disposition on a review row is the same `DispositionDetail` the per-item
+endpoint returns, built by the same `_as_disposition_detail` mapper — the review
+table and the item page cannot drift into describing one decision two different
+ways. `_dispositions_for_items` is the batched form of that read and nothing
+else; the single-item endpoint still reads one document.
+
+`ItemSummary` carries `decided_channel` for the same reason, filled from that
+same batched read on the list endpoint and one extra document read on
+`GET /items/{id}`. It is deliberately *not* `suggested_disposition`: one is
+Steward's reading of a photograph, the other is what the executor decided, and
+a dashboard card that conflates them would be lying about which it is showing.
+The channel alone — no platform, no reason — because a card that needs those has
+an item page one click away.
 
 `GET /estates/{id}/me` returns the caller's role on an estate, and is
 deliberately **not** a 403 for a non-member — "you have no role here" is a fact
@@ -197,7 +213,17 @@ what is *allowed*; every write still goes through `require_role`.
 
 `GET /items/{id}/resolution` returns `null` rather than 404 when nothing has
 been decided: no decision yet is the ordinary state of most items, not a missing
-resource.
+resource. `GET /items/{id}/disposition` does the same, and nests the
+MarketplaceListing inside the disposition when there is one — the only moment
+anything wants a listing is immediately after reading its disposition, so a
+second round trip would buy nothing. Both are readable by any accepted member:
+where a piece is headed is family news, even though only the executor decides
+it.
+
+`POST /items/{id}/marketplace-listing` is executor-only and runs
+`recommend_channel`, which is a real Gemini call. It 409s on a donate or discard
+disposition, and on an item with no disposition at all — see the Tier 2 section
+below.
 
 `GET /estates/{id}/messages` is the whole feed — item-specific and general
 interleaved by time, because the data model keeps them in one collection with a
@@ -385,13 +411,17 @@ The first piece of Tier 2, built only because it was explicitly asked for —
 CLAUDE.md gates this tier behind an explicit request.
 
 `marketplace.recommend_channel(item_id)` reads the item's Disposition, asks
-Gemini where to sell it, and writes a `MarketplaceListing` in `draft`. It attaches
-at the Disposition seam exactly as the data model describes: nothing in Tier 1
-changed to accommodate it.
+Gemini where to sell it, what to ask for it and how to describe it, and writes a
+`MarketplaceListing` in `draft`. It attaches at the Disposition seam exactly as
+the data model describes: nothing in Tier 1 changed to accommodate it.
 
-**Channel recommendation only.** `suggested_price`, `listing_draft_title` and
-`listing_draft_description` are written **null** — "not done yet", not "none
-needed". Pricing and draft text are separate, later work.
+**One call for all four fields**, not a channel call followed by a pricing call.
+They condition on each other — the same sideboard is worded and priced one way
+as a local Facebook collection and another way as an eBay listing to a
+collector, and a second call would be free to disagree with the first. Asking
+once also halves the wait the executor sits through, and no caller wants the
+platform without the rest. `listing_url` stays null: posting it somewhere is a
+human act, not a generated one.
 
 - **Only `sell_marketplace` dispositions are eligible.** A donate or discard
   decision raises `MarketplaceError`, and so does an item with no disposition at
@@ -399,35 +429,64 @@ needed". Pricing and draft text are separate, later work.
 - **The Vertex client is classify.py's.** `vertex_client()` and `model_name()`
   were made public for this; there is one client per process, not one per module.
 - **Generation is schema-constrained** so `platform` can only be one of the five
-  the data model allows — the model cannot invent a sixth.
+  the data model allows — the model cannot invent a sixth — and
+  `suggested_price` comes back as a number rather than "about $40".
+- **The price is a starting point, and the prompt says so.** A defensible
+  ballpark the executor will adjust, rounded to something a person would type.
+  `_price()` rejects negatives, NaN and anything over $1,000,000 as a parse
+  artefact rather than storing it.
+- **The draft copy has to name the damage.** The prompt puts wear, breakage and
+  missing pieces in the description rather than leaving them for the buyer to
+  find, and forbids inventing any detail not in the condition notes — so a thin
+  set of notes produces a short description, not a padded one.
 - **Failure degrades honestly.** A transport error, a quota rejection or an
   unparseable reply all come back as `platform=other` with "Couldn't work out the
-  best place for this one — worth having a look yourself." Same shape as
-  classify.py: an "I don't know" that is visible in the data, never a plausible
-  guess.
+  best place for this one — worth having a look yourself", and the other three
+  fields null. Same shape as classify.py: an "I don't know" that is visible in
+  the data, never a plausible guess.
+- **A partial reply keeps the part that worked.** A response good enough to name
+  a platform but not to price the thing nulls the price alone rather than being
+  thrown away whole — so the executor still gets the channel and its reason.
 - One listing per disposition, via a deterministic id (`listing__{disposition_id}`),
   so re-running replaces the draft rather than stacking them.
 
 Verified against real Firestore and real Gemini (`test_marketplace.py`):
 
 ```
-demo-brass-lamp      table lamp   -> ebay
-  "Listing this 1970s brass lamp on eBay is your best option, as vintage
-   enthusiasts regularly search there for retro pieces they can easily restore
-   with a new shade."
+demo-canteen-cutlery silverware -> ebay, $45
+  reason: "An antique Sheffield plate cutlery set is best suited for eBay,
+           where collectors and vintage buyers specifically search for
+           historical tableware despite some wear."
+  title : "Vintage Unmarked Sheffield Plate Cutlery Canteen, Service for Six"
+  body  : "An unmarked Sheffield plate canteen of cutlery for six, presented in
+           a baize-lined oak box. Please note that the silver plating has worn
+           to the copper on the backs of the spoons, two teaspoons are missing,
+           and the box lock does not catch."
 
-demo-canteen-cutlery silverware   -> ebay
-  "This Sheffield plate cutlery set in its oak box is best suited for eBay,
-   where collectors and restorers specifically search for vintage tableware
-   even when it has some wear or missing pieces."
+demo-brass-lamp      table lamp -> fb_marketplace, $35
+  reason: "This brass table lamp is awkward and fragile to post with its shade,
+           so listing on Facebook Marketplace allows for an easy local
+           collection."
+  title : "Vintage 1970s brass column table lamp"
+  body  : "A brass column table lamp from the 1970s. It has been rewired at some
+           point with modern, correctly earthed flex. The pleated shade is
+           water-stained along one side and is slightly out of round."
 
 donate disposition   -> MarketplaceError, nothing written
 no disposition yet   -> MarketplaceError, nothing written
 ```
 
+Every flaw in the condition notes made it into the description — worn plating,
+two missing teaspoons, the lock that doesn't catch, the water-stained shade. The
+two items also reached different platforms for different reasons, which is what
+tells you the model is reading the item rather than the category.
+
 The test asserts each reason draws at least two distinctive words from that
-item's own record, that the two reasons differ in substance, and that neither
-contains reseller-hustle language ("maximise", "act fast", "top dollar" …).
+item's own record, that the two reasons differ in substance, that the price is a
+number in a sane range, that the title fits a title field and isn't SHOUTING,
+that the description carries at least two of the item's own condition words, and
+that none of it contains reseller-hustle language ("maximise", "act fast", "top
+dollar", "rare find", "must see" …).
 
 An earlier version of that check demanded the literal category word and failed
 the cutlery reason, which says "Sheffield plate cutlery set in its oak box" —

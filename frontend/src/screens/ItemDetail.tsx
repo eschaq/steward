@@ -8,18 +8,26 @@ import {
   fetchItemClaims,
   fetchItemMessages,
   fetchMe,
+  decideDisposition,
+  fetchItemDisposition,
+  requestListing,
+  uploadItemPhoto,
 } from '../api'
 import { useAuth } from '../auth'
 import { Claimants } from '../components/Claimants'
+import { Disposition } from '../components/Disposition'
 import { MessageThread } from '../components/MessageThread'
 import { StatusChip } from '../components/StatusChip'
 import { StewardLockup } from '../components/StewardMark'
 import { ESTATE_ID } from '../firebase'
 import {
   STATUS_MEANING,
+  firstPhoto,
   isClaimable,
   isItemStatus,
   type Claimant,
+  type DispositionChoice,
+  type DispositionDetail,
   type Item,
   type Me,
   type Message,
@@ -39,6 +47,9 @@ export function ItemDetail() {
   const [me, setMe] = useState<Me | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
   const [claiming, setClaiming] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [disposition, setDisposition] = useState<DispositionDetail | null>(null)
+  const [deciding, setDeciding] = useState<DispositionChoice | null>(null)
   const [comment, setComment] = useState('')
 
   const load = useCallback(async () => {
@@ -46,16 +57,18 @@ export function ItemDetail() {
     try {
       // Both together: a status without its thread is half the story, and the
       // thread is what explains the status.
-      const [fetched, thread, asked, standing] = await Promise.all([
+      const [fetched, thread, asked, standing, headed] = await Promise.all([
         fetchItem(itemId),
         fetchItemMessages(itemId),
         fetchItemClaims(itemId),
         fetchMe(ESTATE_ID),
+        fetchItemDisposition(itemId),
       ])
       setItem(fetched)
       setMessages(thread.messages)
       setClaims(asked.claims)
       setMe(standing)
+      setDisposition(headed)
     } catch (error) {
       setProblem(
         error instanceof ApiError ? error.message : `Couldn't load this item: ${error}`,
@@ -86,6 +99,43 @@ export function ItemDetail() {
     }
   }
 
+  async function onPhoto(file: File | undefined) {
+    if (!file) return
+    setProblem(null)
+    setUploading(true)
+    try {
+      // The endpoint returns the updated item, so the photo appears without a
+      // refetch — and the placard expands from its slim band to the full
+      // two-column treatment on the same render.
+      setItem(await uploadItemPhoto(itemId, file))
+    } catch (error) {
+      setProblem(
+        error instanceof ApiError ? error.message : `Couldn't add that photo: ${error}`,
+      )
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function onDecideDisposition(choice: DispositionChoice) {
+    setProblem(null)
+    setDeciding(choice)
+    try {
+      await decideDisposition(itemId, choice)
+      // A sell decision without a channel is a half-finished thought, so the
+      // recommendation is part of the same action rather than a second button
+      // the executor has to know to press.
+      if (choice === 'sell') await requestListing(itemId)
+      setDisposition(await fetchItemDisposition(itemId))
+    } catch (error) {
+      setProblem(
+        error instanceof ApiError ? error.message : `Couldn't record that: ${error}`,
+      )
+    } finally {
+      setDeciding(null)
+    }
+  }
+
   // The mediation post, if there is one — the agent's answer to a contested
   // item, which is the whole behaviour made visible.
   const mediationId = useMemo(() => {
@@ -93,8 +143,8 @@ export function ItemDetail() {
     return messages?.find((m) => m.is_agent && m.id.startsWith('agent-mediate__'))?.id ?? null
   }, [item?.status, messages])
 
-  const photo = item?.photo_urls?.[0]
-  const usablePhoto = Boolean(photo && /^https?:/.test(photo))
+  const photo = firstPhoto(item?.photo_urls)
+  const usablePhoto = Boolean(photo)
   const claimable = Boolean(item && isClaimable(item.status))
 
   return (
@@ -137,6 +187,18 @@ export function ItemDetail() {
             <div className={`placard__photo${usablePhoto ? '' : ' card__photo--empty'}`}>
               {usablePhoto ? (
                 <img src={photo} alt={item.ai_category} />
+              ) : me?.role === 'executor' ? (
+                <label className="photo-add">
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/heic"
+                    onChange={(e) => void onPhoto(e.target.files?.[0])}
+                    disabled={uploading}
+                  />
+                  <span className="photo-add__label">
+                    {uploading ? 'Adding the photo…' : 'No photo yet — add one'}
+                  </span>
+                </label>
               ) : (
                 <span>No photo yet</span>
               )}
@@ -219,6 +281,13 @@ export function ItemDetail() {
           </article>
 
           <Claimants claims={claims ?? []} />
+
+          <Disposition
+            decided={disposition}
+            canDecide={me?.role === 'executor' && item.status === 'resolved'}
+            onDecide={onDecideDisposition}
+            working={deciding}
+          />
 
           <section className="thread-section">
             <h2 className="eyebrow">About this one</h2>

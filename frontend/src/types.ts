@@ -22,6 +22,9 @@ export interface Item {
   suggested_disposition: string
   status: string
   photo_urls: string[]
+  /** What the executor actually decided, as against `suggested_disposition`,
+   * which is only ever Steward's reading of the photo. Null until decided. */
+  decided_channel: string | null
 }
 
 export interface Claimant {
@@ -99,6 +102,17 @@ export const STATUS_MEANING: Record<ItemStatus, string> = {
   resolved: 'The executor has settled who it goes to.',
   routed: 'On its way — donated, sold, or discarded.',
   needs_clarification: "Steward couldn't place this one and has asked about it.",
+}
+
+/** The first photograph a browser can actually load.
+ *
+ * `photo_urls` is an array and its first entry is not necessarily displayable —
+ * classification records the local file it read (`file:///…`), and an uploaded
+ * photo is appended after it. Taking [0] blindly renders "no photo yet" for an
+ * item that has one.
+ */
+export function firstPhoto(urls: string[] | undefined): string | undefined {
+  return urls?.find((url) => /^https?:/i.test(url))
 }
 
 export function isItemStatus(value: string): value is ItemStatus {
@@ -184,6 +198,9 @@ export interface ReviewRow {
   suggested_disposition: string
   status: string
   claimant_count: number
+  /** First photograph, if the item has one — so the table can show a thumbnail
+   * without a second request per row. */
+  photo_url: string | null
   /** Set only when exactly one person asked — the case the table can settle
    * in one click without hiding anything from the executor. */
   sole_claimant_id: string | null
@@ -191,6 +208,9 @@ export interface ReviewRow {
   decided_type: string | null
   decided_to_name: string | null
   decided_notes: string | null
+  /** Where the piece is headed, once the executor has said. Null means nobody
+   * has decided yet — for a settled item that is a prompt, not an absence. */
+  disposition: DispositionDetail | null
 }
 
 export interface ReviewResponse {
@@ -209,3 +229,78 @@ export const REVIEW_ORDER: readonly ItemStatus[] = [
   'resolved',
   'routed',
 ]
+
+/** The three channels an executor can choose in the UI. `sell_auction_bulk` is
+ * Tier 3 and has no path to it — see the data model doc. */
+export const DISPOSITION_CHOICES = ['donate', 'sell', 'discard'] as const
+export type DispositionChoice = (typeof DISPOSITION_CHOICES)[number]
+
+export const DISPOSITION_LABEL: Record<DispositionChoice, string> = {
+  donate: 'Give it away',
+  sell: 'Sell it',
+  discard: 'Let it go',
+}
+
+export const DISPOSITION_HELP: Record<DispositionChoice, string> = {
+  donate: 'To a charity shop, or to someone who will use it.',
+  sell: "Steward will suggest where to list it, and why that's the right place.",
+  discard: "It has come to the end of its life and isn't worth passing on.",
+}
+
+/** What the stored channel is called when read back. `sell` becomes
+ * `sell_marketplace` at the Disposition seam. */
+/** The same four destinations, short enough for a table cell. `whereItGoes()`
+ * is what screens should call — it folds in the marketplace platform, so a sold
+ * piece names where rather than just saying it is being sold. */
+export const CHANNEL_SHORT: Record<string, string> = {
+  donate: 'Given away',
+  discard: 'Let go',
+  sell_marketplace: 'Sold',
+  sell_auction_bulk: 'Auction',
+}
+
+export function whereItGoes(disposition: DispositionDetail | null): string | null {
+  if (!disposition) return null
+  const short = CHANNEL_SHORT[disposition.channel] ?? disposition.channel
+  const platform = disposition.listing?.platform
+  if (disposition.channel === 'sell_marketplace' && platform) {
+    return `Sold via ${PLATFORM_LABEL[platform] ?? platform}`
+  }
+  return short
+}
+
+export const CHANNEL_LABEL: Record<string, string> = {
+  donate: 'Being given away',
+  discard: 'Being let go',
+  sell_marketplace: 'Being sold',
+  sell_auction_bulk: 'Going to auction',
+}
+
+export const PLATFORM_LABEL: Record<string, string> = {
+  vinted: 'Vinted',
+  fb_marketplace: 'Facebook Marketplace',
+  ebay: 'eBay',
+  poshmark: 'Poshmark',
+  other: 'Somewhere else',
+}
+
+export interface ListingDetail {
+  listing_id: string
+  disposition_id: string
+  platform: string
+  platform_recommendation_reason: string
+  suggested_price: number | null
+  listing_draft_title: string | null
+  listing_draft_description: string | null
+  listing_url: string | null
+  listing_status: string
+}
+
+export interface DispositionDetail {
+  disposition_id: string
+  item_id: string
+  channel: string
+  status: string
+  completed_at: string | null
+  listing: ListingDetail | null
+}

@@ -142,8 +142,9 @@ class MarketplaceListing(BaseModel):
     disposition_id: str
     platform: Platform
     platform_recommendation_reason: str
-    # Pricing and draft text are a separate, later piece of work. Null here is
-    # "not done yet", not "none needed".
+    # Written together with the platform, by one Gemini call. Still Optional:
+    # null means that part of the reply was unusable, and the executor sees an
+    # honest gap rather than an invented price.
     suggested_price: Optional[float] = None
     listing_draft_title: Optional[str] = None
     listing_draft_description: Optional[str] = None

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 
-import type { Item } from '../types'
+import { CHANNEL_SHORT, firstPhoto, type Item } from '../types'
 import { StatusChip } from './StatusChip'
 
 function titleCase(value: string): string {
@@ -14,8 +14,8 @@ function titleCase(value: string): string {
  * card, not a small "view" affordance tucked in a corner.
  */
 export function ItemCard({ item }: { item: Item }) {
-  const photo = item.photo_urls?.[0]
-  const usable = Boolean(photo && /^https?:/.test(photo))
+  const photo = firstPhoto(item.photo_urls)
+  const usable = Boolean(photo)
 
   // The data model gives an item no name, so the category is the name — and the
   // era or brand is provenance, not a title. Using the era as the heading reads
@@ -48,10 +48,14 @@ export function ItemCard({ item }: { item: Item }) {
         <p className="card__notes">{item.ai_condition_notes}</p>
 
         <div className="card__foot">
+          {/* Once the executor has decided, their decision is the fact — the
+              suggestion it replaced is history and stops being shown. */}
           <span>
-            {item.suggested_disposition === 'uncertain'
-              ? 'No suggestion yet'
-              : `Leaning ${item.suggested_disposition}`}
+            {item.decided_channel
+              ? CHANNEL_SHORT[item.decided_channel] ?? item.decided_channel
+              : item.suggested_disposition === 'uncertain'
+                ? 'No suggestion yet'
+                : `Leaning ${item.suggested_disposition}`}
           </span>
           <span>{Math.round(item.ai_classification_confidence * 100)}% sure</span>
         </div>

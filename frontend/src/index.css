@@ -1544,7 +1544,10 @@ h3 {
   color: var(--primary);
 }
 
+/* Its own line: the era is provenance under the name, not a continuation of it
+   — "Table Lampbrass, 1970s" otherwise. */
 .review__era {
+  display: block;
   font-size: 12px;
   color: var(--outline);
 }
@@ -1557,8 +1560,11 @@ h3 {
   margin-top: 2px;
 }
 
+/* With five columns the table is tight, and a three-line "No suggestion / yet"
+   reads as noise. */
 .review__quiet {
   color: var(--outline);
+  white-space: nowrap;
 }
 
 .review__action {
@@ -1615,4 +1621,278 @@ h3 {
     text-align: left;
     padding-bottom: 18px;
   }
+}
+
+/* --- adding a photograph -------------------------------------------------- */
+/* The whole empty panel is the drop target — a small "choose file" button in
+ * the corner of a large blank area is a smaller target than the blank area
+ * itself, and reads as an afterthought. */
+
+.photo-add {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+
+.photo-add:hover {
+  background: rgba(142, 72, 49, 0.06);
+}
+
+.photo-add input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.photo-add__label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--primary);
+  border: 1px dashed var(--outline-variant);
+  border-radius: var(--r-tag);
+  padding: 8px 14px;
+  background: var(--surface-lowest);
+  pointer-events: none;
+}
+
+/* --- review table thumbnails ---------------------------------------------- */
+
+.review__item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.review__thumb {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--r-tag);
+  object-fit: cover;
+  flex: none;
+  border: 1px solid var(--hairline);
+}
+
+.review__thumb--none {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--r-tag);
+  flex: none;
+  background: var(--surface-mid);
+  border: 1px solid var(--hairline);
+}
+
+/* --- where it goes next --------------------------------------------------- */
+
+.disposition {
+  margin-top: 30px;
+  background: var(--surface-lowest);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-row);
+  padding: 22px 26px 24px;
+}
+
+.disposition .eyebrow {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.disposition__intro {
+  margin: 0 0 16px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--on-surface-variant);
+  max-width: 56ch;
+}
+
+.disposition__choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.disposition__choice {
+  font-family: var(--sans);
+  text-align: left;
+  padding: 16px 18px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-row);
+  background: var(--surface-low);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.disposition__choice:hover:not(:disabled) {
+  background: var(--surface-mid);
+  border-color: var(--outline-variant);
+}
+
+.disposition__choice:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.disposition__choice--on {
+  border-color: var(--primary);
+  background: rgba(255, 219, 208, 0.32);
+}
+
+.disposition__choice-name {
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--on-surface);
+}
+
+.disposition__choice-help {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--on-surface-variant);
+}
+
+/* Decided: the sage of settled, same as a recorded resolution. */
+.disposition--done {
+  background: rgba(215, 232, 200, 0.34);
+  border-color: var(--sage-outline);
+}
+
+.disposition--done .eyebrow {
+  color: var(--on-sage-variant);
+}
+
+.disposition__what {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 24px;
+  line-height: 1.25;
+  font-weight: 600;
+  color: var(--on-sage);
+}
+
+/* --- the channel recommendation ------------------------------------------- */
+
+.listing {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--sage-outline);
+}
+
+.listing__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.listing__head .eyebrow {
+  margin: 0;
+  display: inline;
+}
+
+/* A brand name is not a status word — "eBay" and "Facebook Marketplace" read
+   as themselves, not shouted. */
+.listing__platform {
+  background: var(--surface-lowest);
+  border-color: var(--sage-outline);
+  color: var(--on-sage);
+  text-transform: none;
+  letter-spacing: 0.01em;
+  font-size: 12.5px;
+}
+
+.listing__reason {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.65;
+  color: #33402a;
+  max-width: 62ch;
+}
+
+.listing__pending {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--on-sage-variant);
+}
+
+.review__destination {
+  font-family: var(--serif);
+  font-size: 15px;
+  color: var(--on-sage);
+  background: var(--sage);
+  border: 1px solid var(--sage-outline);
+  border-radius: var(--r-tag);
+  padding: 3px 9px;
+  white-space: nowrap;
+}
+
+/* --- the asking price and the draft listing ------------------------------- */
+
+.listing__price {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0 0;
+}
+
+.listing__amount {
+  font-family: var(--serif);
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--on-sage);
+}
+
+.listing__price-note {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--on-sage-variant);
+  max-width: 40ch;
+}
+
+.listing__draft {
+  margin-top: 18px;
+  padding: 16px 18px 14px;
+  background: var(--surface-lowest);
+  border: 1px solid var(--sage-outline);
+  border-radius: var(--r-row);
+}
+
+.listing__draft .eyebrow {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.listing__draft-title {
+  margin: 0 0 8px;
+  font-family: var(--serif);
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--on-surface);
+}
+
+.listing__draft-body {
+  margin: 0;
+  font-size: 15.5px;
+  line-height: 1.65;
+  color: var(--on-surface-variant);
+  max-width: 62ch;
+}
+
+.listing__draft-note {
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--hairline);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--outline);
 }

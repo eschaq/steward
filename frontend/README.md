@@ -1,8 +1,9 @@
 # Steward — frontend
 
-React + Vite + TypeScript, with react-router-dom. Four screens: sign-in, the
-inventory dashboard, the item detail view, and the Message Center. Both are wired to the real backend and real Firebase Auth — there is
-no mock data anywhere in here.
+React + Vite + TypeScript, with react-router-dom. Six screens: sign-in, the
+inventory dashboard, the item detail view, the Message Center, the contested
+resolution screen and the executor's review table. All are wired to the real
+backend and real Firebase Auth — there is no mock data anywhere in here.
 
 | Path                          | Purpose                                            |
 | ----------------------------- | -------------------------------------------------- |
@@ -13,11 +14,11 @@ no mock data anywhere in here.
 | `src/index.css`               | The design system as CSS custom properties          |
 | `src/screens/SignIn.tsx`      | Email/password sign-in                              |
 | `src/screens/Dashboard.tsx`   | Inventory grid, status filters                      |
-| `src/screens/ItemDetail.tsx`  | One item: placard, facts, claim action, thread      |
+| `src/screens/ItemDetail.tsx`  | One item: placard, facts, claim action, where it goes, thread |
 | `src/screens/MessageCenter.tsx` | The estate-wide unified feed, and composing to it |
 | `src/screens/ResolveItem.tsx` | The executor's decision screen                    |
 | `src/screens/Review.tsx`      | The executor's bulk review table                  |
-| `src/components/`             | `ItemCard`, `StatusChip`, `StatusFilters`, `StewardMark`, `Claimants`, `MessageThread` |
+| `src/components/`             | `ItemCard`, `StatusChip`, `StatusFilters`, `StewardMark`, `Claimants`, `MessageThread`, `Disposition` |
 | `public/brand/`               | Hero photography (greyscale; duotoned in CSS)       |
 | `mockups/`                    | Design comps — not built, not served                |
 | `verify.mjs`                  | Drives the real app in a real browser (Playwright)  |
@@ -33,7 +34,7 @@ no mock data anywhere in here.
 | `/items/:itemId/resolve` | Contested resolution | Executor-only: record how a claimed or contested item was settled. |
 | `/review`         | Review table   | Executor-only: every item on one page, grouped by what needs deciding. |
 
-All four are wired to the real backend against real Firestore. There is no mock
+All six are wired to the real backend against real Firestore. There is no mock
 data anywhere in here.
 
 ## Running it
@@ -359,6 +360,53 @@ Whether to *offer* the controls comes from `GET /estates/{id}/me`. Whether the
 write is *allowed* is still decided by `require_role` server-side; the role check
 in the UI only governs what is on screen.
 
+## Where it goes — disposition, and the marketplace suggestion
+
+On the item detail view, below the claimants. A resolved item with no
+disposition shows the executor three choices — **Give it away / Sell it / Let it
+go** — each with a line saying what it means. Once decided, the controls are
+replaced by a sage panel stating where the piece is headed, read back from the
+stored Disposition. Same completed-state pattern as the resolution screen, for
+the same reason: a recorded decision should read as a fact, not as a form that
+happens to be filled in.
+
+- **It lives on the item page, not a route of its own.** Unlike a contested
+  resolution, this decision needs no weighing of people — the item is already
+  settled. Sending the executor somewhere else to press one of three buttons
+  would be ceremony without a purpose.
+- **Choosing "Sell it" asks Steward where in the same action.** A sell decision
+  with no channel is a half-finished thought, so the click records the
+  disposition *and* requests the recommendation, and the button says "Asking
+  Steward where…" while the second call is out. Making that a separate button
+  would leave a listing nobody knew to ask for.
+- **The recommendation names the item, not the category.** It comes back from a
+  real Gemini call — platform, one plain sentence about *this* piece, a suggested
+  price, and a draft title and description the family could post as written.
+  Platform names read as brands (`eBay`, `Facebook Marketplace`), not shouted in
+  the uppercase every other tag uses.
+- **The price says what it is.** "$45 — a starting point, not an appraisal."
+  Whole dollars, because cents on a suggested asking price pretend to a precision
+  nobody has.
+- **The draft is offered, not imposed.** "The listing, if you want it", and under
+  it "Yours to change before it goes anywhere. Steward has said what's worn or
+  missing — that stays in." The description names the damage; that is the one
+  part worth defending if the family edits it down.
+- **A gap is stated, not hidden.** If the price and wording come back unusable,
+  the panel says "No price or wording came back for this one — worth writing it
+  yourself" rather than leaving three empty fields.
+- **Beneficiaries see the decision, never the controls.** Where a piece is headed
+  is family news; deciding it is not. The offer is gated on
+  `GET /estates/{id}/me`, and `require_role` still decides the write.
+- **The dashboard card shows the decision once there is one**, in place of
+  "Leaning donate". `ItemSummary.decided_channel` comes from the same batched
+  read the review table uses, so this is not a request per card. The suggestion
+  is Steward's reading of a photo; once the executor has decided, that decision
+  is the fact and the guess it replaced stops being shown.
+
+Verified end-to-end in a real browser: a sell decision recorded through the UI on
+a resolved demo item, the eBay recommendation rendered from a live Gemini call,
+and a reload showing the recorded decision rather than the controls again.
+
 ## The review table
 
 `/review` — every item on one page, grouped by what needs deciding: contested,
@@ -377,10 +425,42 @@ Settled rows show what was decided rather than sitting blank. Resolving refetche
 the whole table, because it moves a row between groups and changes the counts
 above it — neither of which the client should guess.
 
+**A fifth column, "Where it goes", on the settled and on-its-way groups only** —
+those are the only items that have anywhere to go yet, so it does not sit empty
+above the rest. A decided row names its destination ("Given away", "Let go",
+"Sold via eBay" — the platform when Steward has recommended one, plain "Sold"
+when it hasn't). An undecided one links into the item instead: settled with no
+disposition is the last thing in this table still asking something of the
+executor, so it gets a prompt rather than a blank cell.
+
+It rides on the same composed `/review` request — the endpoint now batches
+dispositions and their listings alongside claims and resolutions, so the column
+costs no extra round trips.
+
 The nav link is shown to everyone; the screen itself explains that working
 through the estate this way is the executor's job, and points a beneficiary back
 to the inventory. Hiding the link would leave them wondering what they were
 missing.
+
+## Photographs
+
+The executor can attach a photo from the item detail view: the whole empty photo
+panel is the control, because a small "choose file" button in the corner of a
+large blank area is a smaller target than the blank area itself. Beneficiaries
+see the photo but not the control.
+
+The endpoint returns the updated item, so the picture appears without a refetch —
+and the placard expands from its slim no-photo band to the full two-column
+treatment on the same render. The same URL then shows on the dashboard card and
+as a thumbnail in the review table, both fed from the item data those screens
+already load.
+
+**`photo_urls` is an array, and its first entry is not necessarily displayable.**
+Classification records the local file it read (`file:///…`) and an uploaded photo
+is appended *after* it, so `photo_urls[0]` renders "no photo yet" for an item that
+has one. `firstPhoto()` in `types.ts` picks the first `http(s)` entry, and the
+review endpoint does the same server-side. This was a real bug, found by
+uploading to an item that had been classified.
 
 ## Not built yet
 

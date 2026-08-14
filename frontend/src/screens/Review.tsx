@@ -10,6 +10,7 @@ import {
   REVIEW_ORDER,
   RESOLUTION_LABEL,
   isItemStatus,
+  whereItGoes,
   type ItemStatus,
   type Me,
   type ResolutionType,
@@ -142,7 +143,12 @@ export function Review() {
             whatever pace suits.
           </p>
 
-          {grouped.map(([status, group]) => (
+          {grouped.map(([status, group]) => {
+            // Only a settled or routed item has anywhere to go yet, so the
+            // column appears where it means something rather than sitting empty
+            // above every other group.
+            const showsDestination = status === 'resolved' || status === 'routed'
+            return (
             <section className="review__group" key={status}>
               <h2 className="review__heading">
                 <StatusChip status={status} />
@@ -157,21 +163,34 @@ export function Review() {
                     <th scope="col">Item</th>
                     <th scope="col">Asked for by</th>
                     <th scope="col">Suggested</th>
-                    <th scope="col">
-                      {status === 'resolved' || status === 'routed' ? 'Decided' : ''}
-                    </th>
+                    <th scope="col">{showsDestination ? 'Decided' : ''}</th>
+                    {showsDestination && <th scope="col">Where it goes</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {group.map((row) => (
                     <tr key={row.id}>
                       <th scope="row">
-                        <Link to={`/items/${row.id}`} className="review__name">
-                          {titleCase(row.ai_category)}
-                        </Link>
-                        {row.ai_est_era_or_brand && (
-                          <span className="review__era">{row.ai_est_era_or_brand}</span>
-                        )}
+                        <span className="review__item">
+                          {row.photo_url ? (
+                            <img
+                              className="review__thumb"
+                              src={row.photo_url}
+                              alt=""
+                              loading="lazy"
+                            />
+                          ) : (
+                            <span className="review__thumb--none" aria-hidden="true" />
+                          )}
+                          <span>
+                            <Link to={`/items/${row.id}`} className="review__name">
+                              {titleCase(row.ai_category)}
+                            </Link>
+                            {row.ai_est_era_or_brand && (
+                              <span className="review__era">{row.ai_est_era_or_brand}</span>
+                            )}
+                          </span>
+                        </span>
                       </th>
 
                       <td>
@@ -231,12 +250,30 @@ export function Review() {
                           </Link>
                         )}
                       </td>
+
+                      {showsDestination && (
+                        <td>
+                          {row.disposition ? (
+                            <span className="review__destination">
+                              {whereItGoes(row.disposition)}
+                            </span>
+                          ) : (
+                            /* Not an empty cell: settled and undecided is the
+                               one place left where this table has something to
+                               ask of the executor. */
+                            <Link className="review__link" to={`/items/${row.id}`}>
+                              Where does it go? →
+                            </Link>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
               </table>
             </section>
-          ))}
+            )
+          })}
         </>
       )}
     </div>
