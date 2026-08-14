@@ -23,6 +23,7 @@ authentication, which is what Cloud Run serves.
 | `overrides.py`       | OverrideLog + the adaptive suggestion loop                       |
 | `dispositions.py`    | Executor's final call: writes the Disposition row + OverrideLog  |
 | `photos.py`          | Item photographs in Cloud Storage                                |
+| `marketplace.py`     | **Tier 2** — which marketplace to sell on, and why                |
 | `init_firestore.py`  | Seeds one document per collection and reads it back             |
 | `seed_demo_items.py` | Demo inventory for the dashboard — **not** a test fixture       |
 | `test_membership.py` | Script: invite + accept two users, print each role              |
@@ -33,6 +34,7 @@ authentication, which is what Cloud Run serves.
 | `test_overrides.py`  | Script: same photo, cold start vs. after the estate has a habit  |
 | `test_dispositions.py`| Script: a decision writes both docs; uncertain/unresolved refused |
 | `test_recompute.py`  | Script: a stale suggestion catches up; a resolved one is left alone |
+| `test_marketplace.py`| Script: channel recommendation, real Gemini; donate refused      |
 | `test_api.py`        | Script: both behaviors over HTTP via ADK, byte-identical copy    |
 | `test_endpoints.py`  | Script: every endpoint, valid vs unauthorized actor              |
 | `requirements.txt`   | `firebase-admin`, `pydantic`, `google-adk`, `google-genai`, …   |
@@ -376,6 +378,61 @@ Verified run against real Firestore (`test_dispositions.py`):
 (c) unresolved item           -> DispositionError, neither collection touched
 (d) sell -> sell_marketplace, discard -> discard, no path to sell_auction_bulk
 ```
+
+## Marketplace channel (Tier 2)
+
+The first piece of Tier 2, built only because it was explicitly asked for —
+CLAUDE.md gates this tier behind an explicit request.
+
+`marketplace.recommend_channel(item_id)` reads the item's Disposition, asks
+Gemini where to sell it, and writes a `MarketplaceListing` in `draft`. It attaches
+at the Disposition seam exactly as the data model describes: nothing in Tier 1
+changed to accommodate it.
+
+**Channel recommendation only.** `suggested_price`, `listing_draft_title` and
+`listing_draft_description` are written **null** — "not done yet", not "none
+needed". Pricing and draft text are separate, later work.
+
+- **Only `sell_marketplace` dispositions are eligible.** A donate or discard
+  decision raises `MarketplaceError`, and so does an item with no disposition at
+  all. Both are caller mistakes, and skipping silently would hide them.
+- **The Vertex client is classify.py's.** `vertex_client()` and `model_name()`
+  were made public for this; there is one client per process, not one per module.
+- **Generation is schema-constrained** so `platform` can only be one of the five
+  the data model allows — the model cannot invent a sixth.
+- **Failure degrades honestly.** A transport error, a quota rejection or an
+  unparseable reply all come back as `platform=other` with "Couldn't work out the
+  best place for this one — worth having a look yourself." Same shape as
+  classify.py: an "I don't know" that is visible in the data, never a plausible
+  guess.
+- One listing per disposition, via a deterministic id (`listing__{disposition_id}`),
+  so re-running replaces the draft rather than stacking them.
+
+Verified against real Firestore and real Gemini (`test_marketplace.py`):
+
+```
+demo-brass-lamp      table lamp   -> ebay
+  "Listing this 1970s brass lamp on eBay is your best option, as vintage
+   enthusiasts regularly search there for retro pieces they can easily restore
+   with a new shade."
+
+demo-canteen-cutlery silverware   -> ebay
+  "This Sheffield plate cutlery set in its oak box is best suited for eBay,
+   where collectors and restorers specifically search for vintage tableware
+   even when it has some wear or missing pieces."
+
+donate disposition   -> MarketplaceError, nothing written
+no disposition yet   -> MarketplaceError, nothing written
+```
+
+The test asserts each reason draws at least two distinctive words from that
+item's own record, that the two reasons differ in substance, and that neither
+contains reseller-hustle language ("maximise", "act fast", "top dollar" …).
+
+An earlier version of that check demanded the literal category word and failed
+the cutlery reason, which says "Sheffield plate cutlery set in its oak box" —
+more specific than the check allowed for. Testing for a keyword echo is not the
+same as testing for specificity.
 
 ## Adaptive suggestions (OverrideLog)
 

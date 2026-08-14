@@ -117,8 +117,11 @@ class Classification(BaseModel):
 _CLIENT: Optional[genai.Client] = None
 
 
-def _client() -> genai.Client:
+def vertex_client() -> genai.Client:
     """A Vertex AI client on Application Default Credentials, built once.
+
+    Public because marketplace.py needs the same client — one per process, not
+    one per module.
 
     Cached deliberately: the client owns an httpx connection pool and closes it
     when collected, so a per-call client can be finalized out from under an
@@ -138,8 +141,8 @@ def _client() -> genai.Client:
     return _CLIENT
 
 
-def _model_name(model_name: Optional[str] = None) -> str:
-    return model_name or os.environ.get("GEMINI_MODEL", DEFAULT_MODEL)
+def model_name(override: Optional[str] = None) -> str:
+    return override or os.environ.get("GEMINI_MODEL", DEFAULT_MODEL)
 
 
 def _unreadable(reason: str) -> Classification:
@@ -172,7 +175,9 @@ def _parse_json_object(raw: str) -> Optional[dict]:
     return payload if isinstance(payload, dict) else None
 
 
-def classify_image(image_path: str | Path, model_name: Optional[str] = None) -> Classification:
+def classify_image(
+    image_path: str | Path, model_override: Optional[str] = None
+) -> Classification:
     """Classify the household item in `image_path`.
 
     Always returns a Classification. Transport, quota, and parse failures come
@@ -186,8 +191,8 @@ def classify_image(image_path: str | Path, model_name: Optional[str] = None) -> 
     mime_type = mimetypes.guess_type(path.name)[0] or "image/png"
 
     try:
-        response = _client().models.generate_content(
-            model=_model_name(model_name),
+        response = vertex_client().models.generate_content(
+            model=model_name(model_override),
             contents=[
                 PROMPT,
                 types.Part.from_bytes(data=path.read_bytes(), mime_type=mime_type),

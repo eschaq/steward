@@ -112,6 +112,46 @@ class Disposition(BaseModel):
     completed_at: Optional[datetime] = None
 
 
+class Platform(str, Enum):
+    VINTED = "vinted"
+    FB_MARKETPLACE = "fb_marketplace"
+    EBAY = "ebay"
+    POSHMARK = "poshmark"
+    # Honest escape hatch: some belongings do not belong on any of the four, and
+    # saying so beats picking one badly.
+    OTHER = "other"
+
+
+class ListingStatus(str, Enum):
+    DRAFT = "draft"
+    POSTED = "posted"
+    SOLD = "sold"
+    REMOVED = "removed"
+
+
+class MarketplaceListing(BaseModel):
+    """Tier 2. Attaches to a Disposition with channel = sell_marketplace.
+
+    Nothing upstream changes to accommodate it — that is the point of the
+    Disposition seam. Fields are exactly the data model doc's.
+    """
+
+    COLLECTION: ClassVar[str] = "marketplace_listings"
+
+    id: str
+    disposition_id: str
+    platform: Platform
+    platform_recommendation_reason: str
+    # Pricing and draft text are a separate, later piece of work. Null here is
+    # "not done yet", not "none needed".
+    suggested_price: Optional[float] = None
+    listing_draft_title: Optional[str] = None
+    listing_draft_description: Optional[str] = None
+    # Null until it is actually posted somewhere.
+    listing_url: Optional[str] = None
+    listing_status: ListingStatus = ListingStatus.DRAFT
+
+
 class OverrideLog(BaseModel):
     """One executor disposition decision, kept so the agent can learn from it.
 
