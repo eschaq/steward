@@ -24,7 +24,7 @@ from typing import Optional
 
 import os
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -35,7 +35,7 @@ from firebase_app import get_db
 from auth_deps import CallerUid
 from claims import ClaimError, get_claims_for_item, record_claim
 from dispositions import DispositionError, record_disposition_decision
-from items import get_item, list_items_for_estate
+from items import add_photo_url, get_item, list_items_for_estate
 from messages import (
     AGENT_USER_ID,
     display_names_for,
@@ -43,6 +43,7 @@ from messages import (
     get_messages_for_item,
     post_message,
 )
+from photos import MAX_BYTES, PhotoError, store_item_photo
 from membership import (
     MembershipError,
     get_membership,
@@ -315,6 +316,9 @@ class ReviewRow(BaseModel):
     status: str
     # Distinct people, which is what drives the status.
     claimant_count: int
+    # First photograph, if any — the table shows a thumbnail, and fetching it
+    # per row would undo the point of composing this response.
+    photo_url: Optional[str] = None
     # Present only when exactly one person asked — that is the case the table
     # can settle in a single click without hiding anything.
     sole_claimant_id: Optional[str] = None
@@ -525,6 +529,12 @@ def get_estate_review(estate_id: str, uid: CallerUid) -> ReviewResponse:
                 suggested_disposition=item.suggested_disposition.value,
                 status=item.status.value,
                 claimant_count=len(who),
+                # First *loadable* url — classification records the local file
+                # it read, so photo_urls[0] is not necessarily displayable.
+                photo_url=next(
+                    (u for u in item.photo_urls if u.lower().startswith(("http://", "https://"))),
+                    None,
+                ),
                 sole_claimant_id=who[0] if len(who) == 1 else None,
                 sole_claimant_name=names.get(who[0]) if len(who) == 1 else None,
                 decided_type=decided.resolution_type.value if decided else None,
@@ -701,6 +711,39 @@ def post_claim(item_id: str, body: ClaimRequest, uid: CallerUid) -> ClaimRespons
         user_id=claim.user_id,
         item_status=item_status.value,
     )
+
+
+@app.post("/items/{item_id}/photo", response_model=ItemSummary)
+async def post_item_photo(
+    item_id: str, uid: CallerUid, file: UploadFile = File(...)
+) -> ItemSummary:
+    """Attach a photograph to an item. Executor only.
+
+    Cataloguing is the executor's job — a beneficiary adding photographs to
+    someone else's belongings is a different feature with different questions
+    behind it, so this matches the resolve/disposition gate rather than the
+    claim one.
+    """
+    item = _load_item(item_id)
+    try:
+        require_role(uid, item.estate_id, MembershipRole.EXECUTOR)
+    except MembershipError as exc:
+        raise _forbidden(exc) from exc
+
+    data = await file.read()
+    if len(data) > MAX_BYTES:
+        # 413 rather than 409: this is about the request, not the item's state.
+        raise HTTPException(
+            status_code=413,
+            detail=f"That photo is larger than {MAX_BYTES // 1024 // 1024}MB.",
+        )
+
+    try:
+        url = store_item_photo(item_id, data, file.content_type)
+    except PhotoError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    return _summary(add_photo_url(item_id, url))
 
 
 @app.post("/items/{item_id}/resolve", response_model=ResolutionResponse)

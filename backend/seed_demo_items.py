@@ -23,6 +23,10 @@ than no seed data:
   * a `resolved` or `routed` item has a Resolution recorded by the executor
   * `suggested_disposition` stays `uncertain` throughout — see the note at the
     bottom of this file
+  * `photo_urls` is **preserved** across re-runs. Every other field is reset to
+    its seeded value, but photographs are uploaded by a person through the app,
+    not seeded here, and re-running a fixture script should not destroy someone's
+    work
 
 Idempotent: fixed document ids, and prior demo claims/resolutions are cleared
 before the run so re-seeding doesn't stack duplicates.
@@ -367,14 +371,32 @@ def main() -> int:
     print()
 
     tally: dict[str, int] = {}
+    kept_photos = 0
     for record in ITEMS:
-        db.collection(Item.COLLECTION).document(record.id).set(to_firestore(record))
+        doc_ref = db.collection(Item.COLLECTION).document(record.id)
+
+        # A full overwrite is what this script wants for every *seeded* field —
+        # status, notes and confidence all go back to their starting values. But
+        # photo_urls is not seeded: it is filled by a person uploading a photo
+        # through the app, and re-seeding must not throw that away. Carry
+        # anything already there onto the record before writing.
+        existing = doc_ref.get()
+        if existing.exists:
+            already = existing.to_dict().get("photo_urls") or []
+            if already:
+                record = record.model_copy(update={"photo_urls": already})
+                kept_photos += 1
+
+        doc_ref.set(to_firestore(record))
         tally[record.status.value] = tally.get(record.status.value, 0) + 1
         era = record.ai_est_era_or_brand or "—"
         print(
             f"  {record.status.value:<20} {record.ai_category:<16} "
             f"{record.ai_classification_confidence:.2f}  {era}"
         )
+
+    if kept_photos:
+        print(f"\n  kept      {kept_photos} uploaded photo(s) — not seeded, not overwritten")
 
     print()
     for item_id, claimants in CLAIMS.items():

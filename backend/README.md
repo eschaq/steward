@@ -22,6 +22,7 @@ authentication, which is what Cloud Run serves.
 | `resolutions.py`     | Executor resolves a claimed/contested item; flips to `resolved` |
 | `overrides.py`       | OverrideLog + the adaptive suggestion loop                       |
 | `dispositions.py`    | Executor's final call: writes the Disposition row + OverrideLog  |
+| `photos.py`          | Item photographs in Cloud Storage                                |
 | `init_firestore.py`  | Seeds one document per collection and reads it back             |
 | `seed_demo_items.py` | Demo inventory for the dashboard — **not** a test fixture       |
 | `test_membership.py` | Script: invite + accept two users, print each role              |
@@ -160,6 +161,7 @@ The equality assertions compare against `messages.py`'s own copy functions, so
 | `POST /items/{id}/claim`              | any accepted member        | `record_claim`                 |
 | `POST /items/{id}/resolve`            | executor                   | `resolve_item`                 |
 | `POST /items/{id}/disposition`        | executor                   | `record_disposition_decision`  |
+| `POST /items/{id}/photo`              | executor                   | `store_item_photo`             |
 | `POST /items/{id}/agent-message`      | any accepted member        | `run_behavior_for_item`        |
 
 ### Authentication
@@ -264,6 +266,44 @@ service account to sign with and this machine authenticates as a user.
 It sets the account's password to do that, so it **refuses any address outside
 `@example.com`**. The browser API key comes from `STEWARD_WEB_API_KEY` or, absent
 that, from `gcloud services api-keys` — it is not committed.
+
+## Item photographs
+
+`photos.py` stores an uploaded photograph in Cloud Storage and `items.add_photo_url`
+appends the resulting URL to `Item.photo_urls`. Executor only — cataloguing is
+their job, and a beneficiary adding photographs to someone else's belongings is a
+different feature with different questions behind it.
+
+Bucket: **`steward-hackathon-505217-item-photos`**, us-central1, uniform
+bucket-level access, `allUsers` granted `roles/storage.objectViewer`. The
+`.firebasestorage.app` default bucket does not exist and cannot be created with
+`gcloud` — Google owns that domain — so this is an ordinary project bucket.
+
+### Public-read objects, not signed URLs
+
+Chosen deliberately:
+
+- **Signed URLs need something to sign with.** This project authenticates as a
+  user (ADC, no service-account key), so `generate_signed_url` has no private key
+  and would need an IAM signBlob round trip against a service account to
+  impersonate — the same wall `auth.create_custom_token` hit in `dev_tokens.py`.
+- **A signed URL expires.** `photo_urls` is a *stored* field that the dashboard
+  and the review table read directly. A URL that dies in an hour would mean
+  minting fresh ones on every read — a different shape from what the data model
+  describes.
+
+Each object path carries a `uuid4` (`items/{item_id}/{uuid}.jpg`), so a URL
+cannot be guessed from an item id. That is the same practical property a Firebase
+download token gives.
+
+⚠️ **It is still readable by anyone holding the link**, and these are a grieving
+family's belongings. Fine for a demo on a private project; not the right answer
+for real estates. Before that, either proxy reads through the API behind
+`require_role`, or attach a service account and switch to short-lived signed URLs
+generated per read.
+
+Uploads are capped at 12MB and limited to jpeg/png/webp/heic. Anything else comes
+back as a 422 saying what was wrong, not a silent drop.
 
 ## Dispositions
 
@@ -756,6 +796,12 @@ every `resolved`/`routed` one, so no status is a label with nothing under it. It
 deliberately writes **no Disposition or OverrideLog rows**: those would change
 what the agent suggests for future items in those categories, and seed data
 should not quietly retrain the adaptive loop.
+
+**Re-running preserves `photo_urls`.** Every other field is overwritten back to
+its seeded value — that is the point of re-seeding — but photographs are uploaded
+by a person through the app, not seeded here. The script reads any existing
+`photo_urls` off the document and carries them onto the record before writing,
+and prints how many it kept. A fixture script should not destroy someone's work.
 
 All ten pass against Vertex AI and real Firestore. `test_classify`,
 `test_overrides`, and `test_recompute` make live Gemini calls; the other six make

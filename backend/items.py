@@ -7,6 +7,7 @@ exactly those fields and nothing more.
 from enum import Enum
 from typing import Optional
 
+from google.cloud.firestore_v1 import ArrayUnion
 from google.cloud.firestore_v1.base_query import FieldFilter
 
 from classify import Classification, classify_image
@@ -61,6 +62,21 @@ def get_item(item_id: str) -> Optional[Item]:
     if not snapshot.exists:
         return None
     return Item.model_validate(snapshot.to_dict())
+
+
+def add_photo_url(item_id: str, url: str) -> Item:
+    """Append one photograph's URL to an item and return the updated item.
+
+    ArrayUnion rather than read-modify-write: two executors adding photos at the
+    same moment should end up with both, not with one silently overwriting the
+    other. The Claim collection makes the same choice for the same reason.
+    """
+    doc_ref = get_db().collection(Item.COLLECTION).document(item_id)
+    if not doc_ref.get().exists:
+        raise ItemError(f"No item {item_id} to attach a photo to.")
+
+    doc_ref.update({"photo_urls": ArrayUnion([url])})
+    return Item.model_validate(doc_ref.get().to_dict())
 
 
 def list_items_for_estate(estate_id: str) -> list[Item]:

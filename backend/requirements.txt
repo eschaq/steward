@@ -16,3 +16,7 @@ uvicorn==0.52.1
 pillow==12.3.0
 # Required by fastapi.testclient, which test_api.py drives the API with.
 httpx==0.28.1
+# Item photographs in Cloud Storage. Both arrive via firebase-admin/google-adk,
+# but photos.py and api.py import them directly, so they are pinned here.
+google-cloud-storage==3.13.1
+python-multipart==0.0.32
