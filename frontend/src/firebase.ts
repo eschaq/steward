@@ -30,4 +30,15 @@ export const app = initializeApp({
 export const auth = getAuth(app)
 
 export const ESTATE_ID = import.meta.env.VITE_ESTATE_ID ?? 'seed-estate-001'
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
+/** Where the backend lives.
+ *
+ * Defaults to *the host you are browsing from*, port 8000 — not a hardcoded
+ * `localhost`. On a phone reaching this over the network, `localhost` means the
+ * phone itself, so a hardcoded value silently points the app at nothing.
+ *
+ * Set VITE_API_BASE_URL to override, which is what a deployed frontend will do
+ * once the backend has its own Cloud Run URL.
+ */
+export const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  `${window.location.protocol}//${window.location.hostname}:8000`

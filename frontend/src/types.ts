@@ -49,12 +49,16 @@ export interface Message {
   user_id: string
   author_name: string
   is_agent: boolean
+  /** The item's category when the message is tied to one — so a feed can name
+   * what it is talking about instead of showing a document id. */
+  item_category: string | null
   text: string
   created_at: string
 }
 
 export interface MessageListResponse {
-  item_id: string
+  item_id?: string | null
+  estate_id?: string | null
   count: number
   messages: Message[]
 }
@@ -112,3 +116,96 @@ export const CLAIMABLE_STATUSES: readonly ItemStatus[] = ['unclaimed', 'conteste
 export function isClaimable(status: string): boolean {
   return (CLAIMABLE_STATUSES as readonly string[]).includes(status)
 }
+
+/** The four ways an executor can settle a contested or claimed item, per the
+ * data model's Resolution entity. */
+export const RESOLUTION_TYPES = [
+  'assigned_to_claimant',
+  'rotation',
+  'outside_appraisal',
+  'executor_override',
+] as const
+
+export type ResolutionType = (typeof RESOLUTION_TYPES)[number]
+
+/** Written for the executor choosing between them, not as enum glosses. */
+export const RESOLUTION_LABEL: Record<ResolutionType, string> = {
+  assigned_to_claimant: 'It goes to one of them',
+  rotation: 'They share it, in turns',
+  outside_appraisal: 'Get it appraised first',
+  executor_override: 'Something else — your call',
+}
+
+export const RESOLUTION_HELP: Record<ResolutionType, string> = {
+  assigned_to_claimant:
+    'One person takes it. Whoever steps back usually gets first choice on something of similar meaning.',
+  rotation: 'It lives with one household for a while, then the other.',
+  outside_appraisal:
+    "Nobody can tell what it's worth, and that's part of the difficulty. Decide after.",
+  executor_override:
+    "Your decision, on whatever grounds. Use this when it isn't going to a claimant.",
+}
+
+/** The two that name a person. The backend enforces this too, and additionally
+ * requires that person to have actually claimed the item. */
+export const NEEDS_RECIPIENT: readonly ResolutionType[] = [
+  'assigned_to_claimant',
+  'rotation',
+]
+
+export function needsRecipient(type: ResolutionType): boolean {
+  return NEEDS_RECIPIENT.includes(type)
+}
+
+export interface Me {
+  estate_id: string
+  user_id: string
+  role: 'executor' | 'beneficiary' | null
+  accepted: boolean
+}
+
+export interface ResolutionDetail {
+  resolution_id: string
+  item_id: string
+  resolution_type: string
+  resolved_by_user_id: string
+  resolved_by_name: string
+  resolved_to_user_id: string | null
+  resolved_to_name: string | null
+  notes: string
+  resolved_at: string
+}
+
+export interface ReviewRow {
+  id: string
+  ai_category: string
+  ai_est_era_or_brand: string | null
+  ai_classification_confidence: number
+  suggested_disposition: string
+  status: string
+  claimant_count: number
+  /** Set only when exactly one person asked — the case the table can settle
+   * in one click without hiding anything from the executor. */
+  sole_claimant_id: string | null
+  sole_claimant_name: string | null
+  decided_type: string | null
+  decided_to_name: string | null
+  decided_notes: string | null
+}
+
+export interface ReviewResponse {
+  estate_id: string
+  count: number
+  rows: ReviewRow[]
+}
+
+/** The order an executor works in: what needs a decision, then what is waiting,
+ * then what is done. Not alphabetical, not the enum's own order. */
+export const REVIEW_ORDER: readonly ItemStatus[] = [
+  'contested',
+  'claimed',
+  'needs_clarification',
+  'unclaimed',
+  'resolved',
+  'routed',
+]

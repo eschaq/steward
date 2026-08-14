@@ -178,8 +178,11 @@ def clarifying_question_text(
     """
     guess = (ai_category or "").strip().lower()
     if guess and guess != "unknown":
+        # "My best guess is X" rather than "It might be a X": categories are a
+        # mix of singular ("armchair"), plural ("photographs") and mass nouns
+        # ("artwork"), and no choice of article is right for all three.
         opening = (
-            f"I couldn't quite place this one. It might be a {guess}, "
+            f"I couldn't quite place this one. My best guess is {guess}, "
             "but I'd rather ask than guess."
         )
     else:

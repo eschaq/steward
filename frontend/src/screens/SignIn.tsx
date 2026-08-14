@@ -46,9 +46,9 @@ export function SignIn() {
 
         <div className="signin__welcome">
           <h1 className="signin__head">
-            Welcome back,
+            Welcome back.
             <br />
-            take your time.
+            Take your time.
           </h1>
           <p className="signin__under">
             The house will be exactly where you left it.

@@ -3,6 +3,9 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from './auth'
 import { Dashboard } from './screens/Dashboard'
 import { ItemDetail } from './screens/ItemDetail'
+import { MessageCenter } from './screens/MessageCenter'
+import { ResolveItem } from './screens/ResolveItem'
+import { Review } from './screens/Review'
 import { SignIn } from './screens/SignIn'
 
 /** Signed out, there is one screen and it isn't addressable. Signed in, items
@@ -20,17 +23,25 @@ function Routed() {
     <Routes>
       <Route path="/" element={<Dashboard />} />
       <Route path="/items/:itemId" element={<ItemDetail />} />
+      <Route path="/items/:itemId/resolve" element={<ResolveItem />} />
+      <Route path="/messages" element={<MessageCenter />} />
+      <Route path="/review" element={<Review />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }
 
+/** Router outside the auth provider, so signing out can clear the URL.
+ *
+ * Nothing above <Routed> needs auth, and useNavigate only works inside a
+ * router — so the provider goes in, not the other way round.
+ */
 export function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
+    <BrowserRouter>
+      <AuthProvider>
         <Routed />
-      </BrowserRouter>
-    </AuthProvider>
+      </AuthProvider>
+    </BrowserRouter>
   )
 }

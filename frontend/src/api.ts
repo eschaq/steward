@@ -10,7 +10,12 @@ import type {
   ClaimListResponse,
   Item,
   ItemListResponse,
+  Me,
+  Message,
   MessageListResponse,
+  ResolutionDetail,
+  ResolutionType,
+  ReviewResponse,
 } from './types'
 
 export class ApiError extends Error {
@@ -39,12 +44,20 @@ async function authorizedFetch(
       body: init?.body ? JSON.stringify(init.body) : undefined,
     })
   } catch {
-    // A dead backend is the likeliest cause in local development, and a blank
-    // screen would leave someone guessing.
+    // fetch() throws the same TypeError for a dead server and for a CORS
+    // rejection, so this cannot say which — and asserting one would send
+    // someone looking in the wrong place. Both are named, most likely first.
+    const sameHost =
+      typeof window !== 'undefined' && API_BASE_URL.includes(window.location.hostname)
     throw new ApiError(
       0,
-      `Couldn't reach the backend at ${API_BASE_URL}. Is it running? ` +
-        '(cd backend && .venv/bin/uvicorn api:app --reload)',
+      `Couldn't reach the backend at ${API_BASE_URL}. Either it isn't running ` +
+        '(cd backend && .venv/bin/uvicorn api:app --reload), or it is running ' +
+        'but refused this origin' +
+        (sameHost ? '' : ' — it is on a different host from this page') +
+        `. For the second, start it with STEWARD_ALLOWED_ORIGINS including ${
+          typeof window !== 'undefined' ? window.location.origin : 'this origin'
+        }.`,
     )
   }
 
@@ -86,4 +99,65 @@ export async function claimItem(itemId: string, comment?: string): Promise<void>
     method: 'POST',
     body: { comment: comment?.trim() || null },
   })
+}
+
+export async function fetchEstateMessages(estateId: string): Promise<MessageListResponse> {
+  const response = await authorizedFetch(
+    `/estates/${encodeURIComponent(estateId)}/messages`,
+  )
+  return (await response.json()) as MessageListResponse
+}
+
+/** Post to the estate's feed. The author is the caller — there is no user id in
+ * the body, so nobody can post as somebody else, or as Steward. */
+export async function postEstateMessage(
+  estateId: string,
+  text: string,
+  itemId?: string,
+): Promise<Message> {
+  const response = await authorizedFetch(`/estates/${encodeURIComponent(estateId)}/messages`, {
+    method: 'POST',
+    body: { text, item_id: itemId ?? null },
+  })
+  return (await response.json()) as Message
+}
+
+/** What the caller is on this estate — used to decide what to offer, never as
+ * the authorization itself. Every write is still checked server-side. */
+export async function fetchMe(estateId: string): Promise<Me> {
+  const response = await authorizedFetch(`/estates/${encodeURIComponent(estateId)}/me`)
+  return (await response.json()) as Me
+}
+
+export async function fetchItemResolution(
+  itemId: string,
+): Promise<ResolutionDetail | null> {
+  const response = await authorizedFetch(
+    `/items/${encodeURIComponent(itemId)}/resolution`,
+  )
+  return (await response.json()) as ResolutionDetail | null
+}
+
+export async function resolveItem(
+  itemId: string,
+  body: {
+    resolution_type: ResolutionType
+    resolved_to_user_id?: string | null
+    notes?: string
+  },
+): Promise<void> {
+  await authorizedFetch(`/items/${encodeURIComponent(itemId)}/resolve`, {
+    method: 'POST',
+    body: {
+      resolution_type: body.resolution_type,
+      resolved_to_user_id: body.resolved_to_user_id ?? null,
+      notes: body.notes?.trim() ?? '',
+    },
+  })
+}
+
+/** Every item with its claim count and its decision, in one request. */
+export async function fetchReview(estateId: string): Promise<ReviewResponse> {
+  const response = await authorizedFetch(`/estates/${encodeURIComponent(estateId)}/review`)
+  return (await response.json()) as ReviewResponse
 }

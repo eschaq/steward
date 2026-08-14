@@ -1,7 +1,7 @@
 # Steward — frontend
 
-React + Vite + TypeScript, with react-router-dom. Three screens: sign-in, the
-inventory dashboard, and the item detail view. Both are wired to the real backend and real Firebase Auth — there is
+React + Vite + TypeScript, with react-router-dom. Four screens: sign-in, the
+inventory dashboard, the item detail view, and the Message Center. Both are wired to the real backend and real Firebase Auth — there is
 no mock data anywhere in here.
 
 | Path                          | Purpose                                            |
@@ -14,19 +14,47 @@ no mock data anywhere in here.
 | `src/screens/SignIn.tsx`      | Email/password sign-in                              |
 | `src/screens/Dashboard.tsx`   | Inventory grid, status filters                      |
 | `src/screens/ItemDetail.tsx`  | One item: placard, facts, claim action, thread      |
+| `src/screens/MessageCenter.tsx` | The estate-wide unified feed, and composing to it |
+| `src/screens/ResolveItem.tsx` | The executor's decision screen                    |
+| `src/screens/Review.tsx`      | The executor's bulk review table                  |
 | `src/components/`             | `ItemCard`, `StatusChip`, `StatusFilters`, `StewardMark`, `Claimants`, `MessageThread` |
 | `public/brand/`               | Hero photography (greyscale; duotoned in CSS)       |
 | `mockups/`                    | Design comps — not built, not served                |
 | `verify.mjs`                  | Drives the real app in a real browser (Playwright)  |
+
+## The screens
+
+| Route             | Screen         | What it does                                    |
+| ----------------- | -------------- | ----------------------------------------------- |
+| —                 | Sign-in        | Email/password against Firebase Auth. Shown whenever nobody is signed in; not addressable. |
+| `/`               | Dashboard      | The estate's inventory: ledger blocks, all six status filters, the item grid. |
+| `/items/:itemId`  | Item detail    | Placard, who's asked and why, the item's message thread, and the claim action. |
+| `/messages`       | Message Center | The estate-wide unified feed, and composing to it. |
+| `/items/:itemId/resolve` | Contested resolution | Executor-only: record how a claimed or contested item was settled. |
+| `/review`         | Review table   | Executor-only: every item on one page, grouped by what needs deciding. |
+
+All four are wired to the real backend against real Firestore. There is no mock
+data anywhere in here.
 
 ## Running it
 
 Both servers, in two terminals:
 
 ```bash
-cd backend  && .venv/bin/uvicorn api:app --port 8000
-cd frontend && npm install && npm run dev        # http://localhost:5173
+# Backend — http://localhost:8000
+cd backend
+.venv/bin/uvicorn api:app --reload --port 8000
+
+# Frontend
+cd frontend
+npm install
+npm run dev
 ```
+
+Vite asks for **:5173** and falls through to **:5174** if something already
+holds it — check what it prints, since the two are easy to confuse when a dev
+server has been left running. The backend allows CORS from both by default; set
+`STEWARD_ALLOWED_ORIGINS` (comma-separated) if you run the frontend elsewhere.
 
 Copy `.env.example` to `.env.local` and fill it in —
 `firebase apps:sdkconfig WEB --project steward-hackathon-505217` prints the
@@ -36,6 +64,68 @@ Sign in with a seeded test user, e.g. `steward-test-executor@example.com`
 (password set by `backend/dev_tokens.py`).
 
 Nothing is deployed. Cloud Run is separate, later work.
+
+## Reaching it from a phone
+
+Both servers bind to loopback by default, and this machine is a **ChromeOS
+Crostini container** — its address (`100.115.92.x`) is on ChromeOS's internal VM
+subnet, which nothing else on your Wi-Fi can route to. Three things have to
+happen.
+
+**1. Bind both servers to all interfaces.**
+
+```bash
+cd frontend && npm run dev:lan                                   # vite --host 0.0.0.0
+cd backend  && .venv/bin/uvicorn api:app --host 0.0.0.0 --port 8000
+```
+
+**2. Forward the ports out of the container.** ChromeOS →
+Settings → Advanced → Developers → Linux development environment →
+**Port forwarding**. Add **5173** and **8000**. Without this the phone cannot
+reach the container at all, whatever the servers are bound to.
+
+**3. Browse to the Chromebook's own LAN address**, not the container's. Find it
+under Settings → Network → your Wi-Fi → IP address; it will look like
+`192.168.x.x`. Then on the phone: `http://192.168.x.x:5173`.
+
+**The backend has to allow that origin.** CORS is an explicit allow-list, not
+`*`, because credentials ride on the Authorization header:
+
+```bash
+cd backend
+STEWARD_ALLOWED_ORIGINS="http://localhost:5173,http://192.168.x.x:5173" \
+  .venv/bin/uvicorn api:app --host 0.0.0.0 --port 8000
+```
+
+Notes from getting this working:
+
+- **Leave `VITE_API_BASE_URL` blank.** The app derives the backend from whatever
+  host you browsed from, port 8000. Hardcoding `http://localhost:8000` is the
+  classic failure here — on the phone, `localhost` is the phone.
+- **Firebase email/password sign-in works from any origin.** Verified over a
+  non-localhost address; the Authorized Domains list governs OAuth redirect
+  flows, not this.
+- **A CORS rejection and a dead backend look identical to `fetch`** — both throw
+  the same TypeError. The error banner names both causes and prints the origin
+  to add, rather than confidently blaming the wrong one.
+- Plain HTTP over the LAN, so no camera or geolocation later without HTTPS.
+  Nothing needs them yet.
+
+## What you are looking at when you test
+
+The estate holds three kinds of item, and they are told apart by their document
+id prefix. This matters when judging whether the app is behaving:
+
+| Prefix  | Where it came from | Trust the `ai_*` fields? |
+| ------- | ------------------ | ------------------------ |
+| `demo-` | `backend/seed_demo_items.py`, **hand-written** | No. Categories, condition notes, era/brand and confidence were typed by a person to make the dashboard look like a real estate. None of it went through Gemini. |
+| `test-` | the backend verification suites | No. Near-identical fixtures, mostly armchairs. |
+| anything else | the real pipeline, `classify.py` → `items.py` | Yes — genuine Gemini output. |
+
+So a `demo-` item showing 44% confidence is not the classifier being unsure; it
+is a number chosen to give the UI a realistic spread. The **agent messages on
+those items are real**, though — the seed script runs the actual ADK behaviours,
+so the mediation on `demo-writing-desk` genuinely names its two claimants.
 
 ## How it hangs together
 
@@ -214,6 +304,85 @@ the whole card rather than an affordance in a corner.
 - Claim is offered on `unclaimed` and `contested` only. A third person asking is
   a real thing that happens; past that, the executor has already decided.
 
+## The Message Center
+
+`/messages`, reachable from the nav in the dark hero on every signed-in screen.
+
+**One feed, not two.** Item-specific and general discussion are interleaved by
+time, because the data model keeps them in a single collection with a nullable
+`item_id`. Splitting them into tabs here would rebuild exactly the separation
+the data model avoids. The per-item thread on ItemDetail is the same data
+filtered to one item — same `MessageThread` component, with `showItems` on in
+the estate feed and off on the item page, where the item is the page you are
+already on.
+
+A message tied to an item carries a link naming it — *About the writing desk →*
+— so the agent's "Sarah and David have both asked for this one" is one click
+from the desk itself. A general post says *About the estate* rather than leaving
+a gap, since a null `item_id` is a deliberate kind of message, not a missing
+link.
+
+Posting appends the server's own copy of the message rather than refetching: it
+comes back with the author name and timestamp already resolved, so it appears at
+once without a round trip that could reorder the feed underneath. The compose
+button stays disabled until the feed has loaded — appending to a feed that isn't
+there yet would replace it with the single message just posted.
+
+## The resolution screen
+
+`/items/:itemId/resolve` — **a route of its own, not a panel inside ItemDetail.**
+Recording a resolution is a decision with consequences: it moves the item out of
+the claim flow and makes it eligible for disposition. A distinct URL makes that a
+deliberate act rather than something reached by scrolling, and gives the executor
+something to come back to or open from a message. Nothing is duplicated to pay
+for it — the claimant list, the mediation post and the status chip are the same
+components ItemDetail uses.
+
+- **Steward's suggestion sits above the form**, not below it, so the executor
+  reads the mediation before choosing rather than scrolling past the controls to
+  find it.
+- **Each resolution type carries its own explanation.** The executor is choosing
+  between four unfamiliar words at a hard moment; a bare radio label would leave
+  them guessing what "rotation" means here.
+- **The recipient is a picker of actual claimants**, never a free-text name. The
+  backend independently requires the recipient to have claimed the item, so those
+  are the only valid choices — and if there are none, the form says so and points
+  at "Something else — your call" instead of failing on submit.
+- **A beneficiary who lands here** sees the item, the suggestion and the
+  claimants, plus a plain line saying only the executor can record the decision
+  and pointing back to the item page. No broken form, no unhandled 403.
+- **Once decided, the controls are gone**, replaced by a sage panel stating what
+  was settled, any note, and who recorded it — read back from the stored
+  Resolution, so it survives a reload.
+
+Whether to *offer* the controls comes from `GET /estates/{id}/me`. Whether the
+write is *allowed* is still decided by `require_role` server-side; the role check
+in the UI only governs what is on screen.
+
+## The review table
+
+`/review` — every item on one page, grouped by what needs deciding: contested,
+claimed, needs-a-look, unspoken-for, settled, on-its-way. That order is the
+executor's working order, not the enum's.
+
+**Where the inline action stops, and why.** A **claimed** item has exactly one
+person's name on it — there is nothing to weigh, so the row settles it in one
+click and says whose name it is. A **contested** item links out to
+`/items/:id/resolve` instead. Settling that from a table would mean choosing
+between two people without reading why either wants it or what Steward
+suggested; speed is the wrong thing to optimise at that moment. The table exists
+to clear the uncontroversial so there is time for the rest.
+
+Settled rows show what was decided rather than sitting blank. Resolving refetches
+the whole table, because it moves a row between groups and changes the counts
+above it — neither of which the client should guess.
+
+The nav link is shown to everyone; the screen itself explains that working
+through the estate this way is the executor's job, and points a beneficiary back
+to the inventory. Hiding the link would leave them wondering what they were
+missing.
+
 ## Not built yet
 
-The Message Center and the contested-resolution view.
+Nothing in Tier 1. Tier 2 (marketplace channel, pricing, listing drafts) and
+Tier 3 remain out of scope.

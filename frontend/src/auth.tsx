@@ -15,6 +15,8 @@ import {
   type User,
 } from 'firebase/auth'
 
+import { useNavigate } from 'react-router-dom'
+
 import { auth } from './firebase'
 
 interface AuthState {
@@ -30,6 +32,7 @@ const AuthContext = createContext<AuthState | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const navigate = useNavigate()
 
   useEffect(() => onAuthStateChanged(auth, (next) => {
     setUser(next)
@@ -43,9 +46,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn: async (email, password) => {
         await signInWithEmailAndPassword(auth, email, password)
       },
-      leave: () => signOut(auth),
+      leave: async () => {
+        await signOut(auth)
+        // Clear the destination as well as the session. Without this the URL
+        // survives sign-out, so on a shared laptop the next person to sign in
+        // lands wherever the last one was reading — and "sign out" should mean
+        // the session ended, not paused.
+        //
+        // `replace` so the signed-in URL doesn't sit in history behind them.
+        //
+        // Arriving at a URL is different: a deep link followed while signed out
+        // still lands where it pointed once you sign in, which is what makes an
+        // item link worth sending to someone.
+        navigate('/', { replace: true })
+      },
     }),
-    [user, loading],
+    [user, loading, navigate],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

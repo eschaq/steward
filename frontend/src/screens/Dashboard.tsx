@@ -5,7 +5,7 @@ import { useAuth } from '../auth'
 import { ESTATE_ID } from '../firebase'
 import { ItemCard } from '../components/ItemCard'
 import { StatusFilters, type Filter } from '../components/StatusFilters'
-import { StewardLockup } from '../components/StewardMark'
+import { EstateNav } from '../components/EstateNav'
 import { ITEM_STATUSES, STATUS_LABEL, type Item, type ItemStatus } from '../types'
 
 function emptyCounts(): Record<ItemStatus, number> {
@@ -67,7 +67,7 @@ export function Dashboard() {
     <div className="page">
       <header className="hero">
         <div className="hero__top">
-          <StewardLockup size={24} color="var(--on-ink)" />
+          <EstateNav active="inventory" />
           <div className="hero__who">
             <span className="hero__email">{user?.email}</span>
             <button

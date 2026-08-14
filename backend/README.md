@@ -149,9 +149,14 @@ The equality assertions compare against `messages.py`'s own copy functions, so
 | `POST /estates/{id}/invite`           | executor                   | `invite_to_estate`             |
 | `POST /estates/{id}/accept`           | the invitee themselves     | `accept_invite`                |
 | `GET  /estates/{id}/items`            | any accepted member        | `list_items_for_estate`        |
+| `GET  /estates/{id}/review`           | any accepted member        | composes items + claims + resolutions |
 | `GET  /items/{id}`                    | any accepted member        | `get_item`                     |
 | `GET  /items/{id}/messages`           | any accepted member        | `get_messages_for_item`        |
 | `GET  /items/{id}/claims`             | any accepted member        | `get_claims_for_item`          |
+| `GET  /estates/{id}/me`               | any signed-in caller       | `get_membership`               |
+| `GET  /estates/{id}/messages`         | any accepted member        | `get_messages_for_estate`      |
+| `GET  /items/{id}/resolution`         | any accepted member        | `get_resolution`               |
+| `POST /estates/{id}/messages`         | any accepted member        | `post_message`                 |
 | `POST /items/{id}/claim`              | any accepted member        | `record_claim`                 |
 | `POST /items/{id}/resolve`            | executor                   | `resolve_item`                 |
 | `POST /items/{id}/disposition`        | executor                   | `record_disposition_decision`  |
@@ -172,6 +177,34 @@ The claims list is readable by any accepted member, not just the executor: a
 family cannot talk a contested piece through if only one person can see who
 wants it. It returns both `count` (documents, duplicates included) and
 `claimant_count` (distinct people) — the second is what drives the item's status.
+
+`GET /estates/{id}/review` exists for one reason: the executor's review table
+needs an item's claim count and its decision alongside it, and asking per item
+turned 38 items into 76 round trips. It composes reads that already exist — no
+new entity, no new collection. Claims are fetched by chunked `in` query (30 ids
+at a time, Firestore's limit) and resolutions by their deterministic document
+ids through `get_all`, so the whole table is a handful of reads rather than one
+per row.
+
+`GET /estates/{id}/me` returns the caller's role on an estate, and is
+deliberately **not** a 403 for a non-member — "you have no role here" is a fact
+the UI needs in order to say so plainly. It governs what is *offered*, never
+what is *allowed*; every write still goes through `require_role`.
+
+`GET /items/{id}/resolution` returns `null` rather than 404 when nothing has
+been decided: no decision yet is the ordinary state of most items, not a missing
+resource.
+
+`GET /estates/{id}/messages` is the whole feed — item-specific and general
+interleaved by time, because the data model keeps them in one collection with a
+nullable `item_id`. The per-item thread is that same data filtered, not a second
+feed. Both go through one `_message_responses` mapper, so the agent/human
+distinction and the name lookup are decided once.
+
+On `POST`, the author is the caller — there is no `user_id` in the body, so
+nobody can post as someone else or as Steward. An `item_id` in the body is
+checked to belong to *this* estate; without that a member could hang a message
+off an item they cannot otherwise see.
 
 The message thread and the claims list both resolve display names server-side. `firestore.rules`
 lets a caller read their own `users` document and nothing else, so a feed
@@ -738,6 +771,35 @@ judged (billing/quota, not code).
 
 Both are idempotent — fixed ids and fixed test emails, so re-running overwrites
 rather than duplicating.
+
+### Java 21, for the Security Rules emulator
+
+Not needed for anything in this directory — the backend suites run against real
+Firestore. It is needed for `rules-tests/` at the repo root, which runs
+`firebase emulators:exec`, and the emulator is a JVM process.
+
+**firebase-tools 15 refuses Java below 21**, and Debian 12's
+`default-jre-headless` is 17, with no `openjdk-21` package in this apt config.
+So a Temurin 21 runtime lives at:
+
+```
+/opt/java/jdk-21.0.12+8-jre     symlinked to /usr/local/bin/java
+```
+
+⚠️ **That is outside the repo and is not reproducible from a checkout.** If this
+Chromebook container is ever wiped or rebuilt, the emulator tests will fail with
+*"firebase-tools no longer supports Java version before 21"* until it is put
+back:
+
+```bash
+curl -sL -o /tmp/jre21.tar.gz \
+  "https://api.adoptium.net/v3/binary/latest/21/ga/linux/x64/jre/hotspot/normal/eclipse"
+sudo mkdir -p /opt/java && sudo tar xzf /tmp/jre21.tar.gz -C /opt/java
+sudo ln -sf /opt/java/jdk-21.0.12+8-jre/bin/java /usr/local/bin/java
+java -version    # expect 21.x
+```
+
+Nothing else in the project depends on a JVM.
 
 ### Credentials note
 

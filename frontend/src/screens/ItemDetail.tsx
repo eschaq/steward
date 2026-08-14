@@ -7,18 +7,21 @@ import {
   fetchItem,
   fetchItemClaims,
   fetchItemMessages,
+  fetchMe,
 } from '../api'
 import { useAuth } from '../auth'
 import { Claimants } from '../components/Claimants'
 import { MessageThread } from '../components/MessageThread'
 import { StatusChip } from '../components/StatusChip'
 import { StewardLockup } from '../components/StewardMark'
+import { ESTATE_ID } from '../firebase'
 import {
   STATUS_MEANING,
   isClaimable,
   isItemStatus,
   type Claimant,
   type Item,
+  type Me,
   type Message,
 } from '../types'
 
@@ -33,6 +36,7 @@ export function ItemDetail() {
   const [item, setItem] = useState<Item | null>(null)
   const [messages, setMessages] = useState<Message[] | null>(null)
   const [claims, setClaims] = useState<Claimant[] | null>(null)
+  const [me, setMe] = useState<Me | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
   const [claiming, setClaiming] = useState(false)
   const [comment, setComment] = useState('')
@@ -42,14 +46,16 @@ export function ItemDetail() {
     try {
       // Both together: a status without its thread is half the story, and the
       // thread is what explains the status.
-      const [fetched, thread, asked] = await Promise.all([
+      const [fetched, thread, asked, standing] = await Promise.all([
         fetchItem(itemId),
         fetchItemMessages(itemId),
         fetchItemClaims(itemId),
+        fetchMe(ESTATE_ID),
       ])
       setItem(fetched)
       setMessages(thread.messages)
       setClaims(asked.claims)
+      setMe(standing)
     } catch (error) {
       setProblem(
         error instanceof ApiError ? error.message : `Couldn't load this item: ${error}`,
@@ -173,6 +179,18 @@ export function ItemDetail() {
                   </dd>
                 </div>
               </dl>
+
+              {/* Only the executor can settle it, so only they are offered the
+                  way through. The route checks again on arrival, and the
+                  backend checks again on write. */}
+              {me?.role === 'executor' &&
+                (item.status === 'contested' || item.status === 'claimed') && (
+                  <div className="settle">
+                    <Link className="button button--sage" to={`/items/${itemId}/resolve`}>
+                      Record how this was settled →
+                    </Link>
+                  </div>
+                )}
 
               {claimable && (
                 <div className="claim">

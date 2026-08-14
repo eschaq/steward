@@ -1167,3 +1167,452 @@ h3 {
   line-height: 1.6;
   color: var(--outline);
 }
+
+/* --- estate nav ----------------------------------------------------------- */
+
+.estate-nav {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+}
+
+.estate-nav__mark {
+  display: inline-flex;
+  color: var(--on-ink);
+  text-decoration: none;
+}
+
+.estate-nav__link {
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--on-ink-muted);
+  text-decoration: none;
+  padding-bottom: 3px;
+  border-bottom: 2px solid transparent;
+  transition: color 150ms ease, border-color 150ms ease;
+}
+
+.estate-nav__link:hover {
+  color: var(--on-ink);
+}
+
+/* The section you are in, marked by a clay rule rather than a filled pill —
+ * the nav sits on a photograph and a solid chip would fight it. */
+.estate-nav__link[aria-current="page"] {
+  color: var(--on-ink);
+  border-bottom-color: var(--ink-accent);
+}
+
+/* --- compose -------------------------------------------------------------- */
+
+.compose {
+  margin-top: 18px;
+  background: var(--surface-lowest);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-row);
+  padding: 20px 22px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.compose__label {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--on-surface-variant);
+}
+
+.compose__box {
+  width: 100%;
+  font-family: var(--sans);
+  font-size: 15.5px;
+  line-height: 1.6;
+  padding: 12px 14px;
+  color: var(--on-surface);
+  background: var(--surface-low);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--r-row);
+  resize: vertical;
+}
+
+.compose__box:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(142, 72, 49, 0.22);
+}
+
+/* --- what a feed message is about ----------------------------------------- */
+
+.msg__about {
+  display: inline-block;
+  margin-bottom: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.msg__about:hover {
+  color: var(--primary-hover);
+  text-decoration: underline;
+}
+
+.msg--agent .msg__about {
+  color: var(--on-sage-variant);
+}
+
+/* A general post is a different kind of thing, not a missing link. */
+.msg__about--general {
+  color: var(--outline);
+}
+
+/* --- the executor's decision screen --------------------------------------- */
+
+.resolve__head {
+  margin-top: 18px;
+  background: var(--surface-lowest);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-row);
+  padding: 24px 26px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.settle {
+  margin-top: 6px;
+  padding-top: 18px;
+  border-top: 1px solid var(--hairline);
+}
+
+.settle .button {
+  text-decoration: none;
+}
+
+.resolve {
+  margin-top: 30px;
+  background: var(--surface-lowest);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-row);
+  padding: 24px 26px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.resolve > .eyebrow {
+  display: block;
+}
+
+.resolve__types {
+  border: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.resolve__legend {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--on-surface-variant);
+  padding: 0 0 8px;
+}
+
+/* Each option carries its own explanation. The executor is choosing between
+ * four unfamiliar words at a hard moment; a bare radio label would make them
+ * guess what "rotation" means here. */
+.resolve__option {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-row);
+  background: var(--surface-low);
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.resolve__option:hover {
+  background: var(--surface-mid);
+}
+
+.resolve__option--on {
+  border-color: var(--primary);
+  background: rgba(255, 219, 208, 0.32);
+}
+
+.resolve__option input {
+  margin-top: 3px;
+  accent-color: var(--primary);
+}
+
+.resolve__option > span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.resolve__option-name {
+  font-family: var(--serif);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--on-surface);
+}
+
+.resolve__option-help {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--on-surface-variant);
+}
+
+/* The light-surface variant of .field — the dark one is the sign-in screen. */
+.field--light > label {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--on-surface-variant);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.field--light {
+  width: 100%;
+}
+
+.field--light select {
+  font-family: var(--sans);
+  font-size: 16px;
+  height: 52px;
+  padding: 0 14px;
+  color: var(--on-surface);
+  background: var(--surface-low);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--r-row);
+}
+
+.field--light select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(142, 72, 49, 0.22);
+}
+
+.resolve__none {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--on-surface-variant);
+}
+
+/* --- what was decided ----------------------------------------------------- */
+/* Replaces the controls once a decision exists. Sage, because settled is the
+ * tone the whole system gives to resolved. */
+
+.decided {
+  margin-top: 30px;
+  background: rgba(215, 232, 200, 0.34);
+  border: 1px solid var(--sage-outline);
+  border-radius: var(--r-row);
+  padding: 22px 26px 24px;
+}
+
+.decided .eyebrow {
+  display: block;
+  color: var(--on-sage-variant);
+  margin-bottom: 10px;
+}
+
+.decided__what {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 24px;
+  line-height: 1.25;
+  font-weight: 600;
+  color: var(--on-sage);
+}
+
+.decided__notes {
+  margin: 12px 0 0;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 16.5px;
+  line-height: 1.6;
+  color: #33402a;
+}
+
+.decided__by {
+  margin: 14px 0 0;
+  font-size: 13px;
+  color: var(--on-sage-variant);
+}
+
+/* --- the executor's review table ------------------------------------------ */
+
+.review__intro {
+  margin: 18px 0 4px;
+  font-size: 16px;
+  color: var(--on-surface-variant);
+  max-width: 62ch;
+}
+
+.review__group {
+  margin-top: 30px;
+}
+
+.review__heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 12px;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.review__count {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  color: var(--outline);
+}
+
+.review {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--surface-lowest);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-row);
+  overflow: hidden;
+}
+
+.review th,
+.review td {
+  text-align: left;
+  padding: 14px 18px;
+  vertical-align: top;
+  font-weight: 400;
+}
+
+/* A quiet header row — this is a ledger of belongings, not a spreadsheet. */
+.review thead th {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--outline);
+  background: var(--surface-low);
+  border-bottom: 1px solid var(--hairline);
+  padding-top: 11px;
+  padding-bottom: 11px;
+}
+
+.review tbody tr + tr th,
+.review tbody tr + tr td {
+  border-top: 1px solid var(--hairline);
+}
+
+.review tbody tr:hover th,
+.review tbody tr:hover td {
+  background: var(--surface-low);
+}
+
+.review tbody th[scope="row"] {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 220px;
+}
+
+.review__name {
+  font-family: var(--serif);
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--on-surface);
+  text-decoration: none;
+}
+
+.review__name:hover {
+  color: var(--primary);
+}
+
+.review__era {
+  font-size: 12px;
+  color: var(--outline);
+}
+
+.review__confidence {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--outline);
+  margin-top: 2px;
+}
+
+.review__quiet {
+  color: var(--outline);
+}
+
+.review__action {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.review__action .button {
+  text-decoration: none;
+}
+
+.review__decided {
+  display: block;
+  font-size: 14px;
+  color: var(--on-sage-variant);
+}
+
+.review__link {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.review__link:hover {
+  text-decoration: underline;
+}
+
+/* Narrow screens: the table becomes stacked cards rather than scrolling
+ * sideways. An executor on a phone should still be able to read a row. */
+@media (max-width: 820px) {
+  .review thead {
+    display: none;
+  }
+  .review,
+  .review tbody,
+  .review tr,
+  .review th,
+  .review td {
+    display: block;
+    width: 100%;
+  }
+  .review tr + tr {
+    border-top: 1px solid var(--hairline);
+  }
+  .review tbody tr + tr th,
+  .review tbody tr + tr td {
+    border-top: none;
+  }
+  .review td {
+    padding-top: 0;
+  }
+  .review__action {
+    text-align: left;
+    padding-bottom: 18px;
+  }
+}
