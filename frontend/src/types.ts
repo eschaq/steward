@@ -176,6 +176,49 @@ export interface Me {
   user_id: string
   role: 'executor' | 'beneficiary' | null
   accepted: boolean
+  /** The estate's own name. Null if the record has none — say something general
+   * rather than printing a document id at a grieving family. */
+  estate_name: string | null
+  /** An invite here is waiting to be accepted. */
+  invite_pending: boolean
+}
+
+export interface Membership {
+  estate_id: string
+  user_id: string
+  role: 'executor' | 'beneficiary'
+  accepted: boolean
+  /** True only when this call is what turned a pending invite into a
+   * membership — the one moment someone is genuinely new here. */
+  first_accept: boolean
+}
+
+export interface Member {
+  user_id: string
+  display_name: string
+  email: string
+  role: 'executor' | 'beneficiary'
+  accepted: boolean
+  invited_at: string
+  accepted_at: string | null
+  is_you: boolean
+}
+
+export interface MemberListResponse {
+  estate_id: string
+  count: number
+  pending_count: number
+  members: Member[]
+}
+
+export const ROLE_LABEL: Record<string, string> = {
+  executor: 'Executor',
+  beneficiary: 'Family',
+}
+
+export const ROLE_HELP: Record<string, string> = {
+  executor: 'Records how contested pieces are settled, and where everything ends up.',
+  beneficiary: 'Can look through the estate and ask for the things that matter to them.',
 }
 
 export interface ResolutionDetail {

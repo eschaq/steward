@@ -14,11 +14,12 @@ import { StewardLockup } from '../components/StewardMark'
  * index.css, so a phone gets the tall frame and a desktop the wide one.
  */
 export function SignIn() {
-  const { signIn } = useAuth()
+  const { signIn, sendResetEmail } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [problem, setProblem] = useState<string | null>(null)
   const [working, setWorking] = useState(false)
+  const [sent, setSent] = useState<string | null>(null)
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
@@ -30,6 +31,32 @@ export function SignIn() {
       // reports the new user.
     } catch (error) {
       setProblem(readableAuthError(error))
+      setWorking(false)
+    }
+  }
+
+  /** First time in for anyone who was invited.
+   *
+   * An invite creates the Auth account with no password, so there is nothing to
+   * type until Firebase has emailed them a link to set one — and the address
+   * can't be self-registered either, because the invite already claimed it.
+   * This is the door.
+   */
+  async function onReset() {
+    const address = email.trim()
+    setProblem(null)
+    setSent(null)
+    if (!address) {
+      setProblem('Put your email address in first, and we\'ll send the link there.')
+      return
+    }
+    setWorking(true)
+    try {
+      await sendResetEmail(address)
+      setSent(address)
+    } catch (error) {
+      setProblem(readableAuthError(error))
+    } finally {
       setWorking(false)
     }
   }
@@ -87,6 +114,13 @@ export function SignIn() {
             </p>
           )}
 
+          {sent && (
+            <p className="notice notice--on-ink" role="status">
+              Sent to {sent}. Follow the link to set a password, then come back
+              and sign in.
+            </p>
+          )}
+
           {/* Clay, not cream: with cream fields above it, a cream button reads as
               a third input rather than the thing you press. */}
           <button className="button button--primary" type="submit" disabled={working}>
@@ -94,8 +128,18 @@ export function SignIn() {
           </button>
         </form>
 
+        <button
+          className="signin__reset"
+          type="button"
+          onClick={() => void onReset()}
+          disabled={working}
+        >
+          Forgot your password?
+        </button>
+
         <p className="signin__foot">
-          Invited to an estate? Use the link in your invitation.
+          Just been invited? Put your email above and use that link — it's how you
+          set a password the first time.
         </p>
       </main>
     </div>

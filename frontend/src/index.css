@@ -280,10 +280,17 @@ h3 {
 
 /* Sentence case, not the uppercase letterspaced treatment used for eyebrows and
  * tags. A field label is an instruction to a person, not a catalogue mark — and
- * uppercase labels are most of what made this screen read as enterprise. */
+ * uppercase labels are most of what made this screen read as enterprise.
+ *
+ * The default is the light surface. Sign-in overrides it below: this colour was
+ * written for Ink first, and a cream label on cream is invisible. */
 .field > label {
   font-size: 13.5px;
   font-weight: 500;
+  color: var(--on-surface);
+}
+
+.signin .field > label {
   color: rgba(249, 239, 232, 0.74);
 }
 
@@ -1895,4 +1902,355 @@ h3 {
   font-size: 13px;
   line-height: 1.5;
   color: var(--outline);
+}
+
+/* --- the welcome ---------------------------------------------------------- */
+
+/* On Ink, like sign-in: DESIGN.md reserves the dark surface for arrival
+   moments, and this is the other one. */
+.welcome {
+  min-height: 100vh;
+  background: var(--ink-deep);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px 20px;
+}
+
+.welcome__panel {
+  width: 100%;
+  max-width: 620px;
+  min-height: 520px;
+  background: var(--ink);
+  border: 1px solid var(--ink-hairline);
+  border-radius: var(--r-card);
+  padding: 26px 34px 30px;
+  display: flex;
+  flex-direction: column;
+}
+
+.welcome__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: var(--on-ink);
+}
+
+.welcome__skip {
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--on-ink-muted);
+  background: none;
+  border: none;
+  padding: 6px 2px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
+
+.welcome__skip:hover {
+  color: var(--on-ink);
+}
+
+.welcome__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 34px 0;
+}
+
+.welcome__title {
+  margin: 10px 0 20px;
+  font-family: var(--serif);
+  font-size: clamp(28px, 4.4vw, 38px);
+  line-height: 1.15;
+  font-weight: 600;
+  color: var(--on-ink);
+  max-width: 20ch;
+}
+
+.welcome__text {
+  margin: 0 0 16px;
+  font-size: 16.5px;
+  line-height: 1.7;
+  color: var(--on-ink-muted);
+  max-width: 54ch;
+}
+
+.welcome__text:last-child {
+  margin-bottom: 0;
+}
+
+.welcome__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding-top: 22px;
+  border-top: 1px solid var(--ink-hairline);
+}
+
+/* Place-markers, not progress: where you are, with no percentage and nothing
+   to complete. */
+.welcome__marks {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.welcome__mark-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--on-ink-faint);
+}
+
+.welcome__mark-dot--here {
+  background: var(--ink-accent);
+}
+
+.welcome__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+@media (max-width: 520px) {
+  .welcome__panel {
+    padding: 22px 22px 26px;
+    min-height: 0;
+  }
+  .welcome__foot {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .welcome__actions {
+    margin-left: 0;
+  }
+  .welcome__actions .button {
+    flex: 1;
+  }
+}
+
+/* --- who else is in this -------------------------------------------------- */
+
+.invite {
+  margin-top: 26px;
+  background: var(--surface-lowest);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-row);
+  padding: 24px 26px 26px;
+}
+
+.invite .eyebrow {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.invite__intro {
+  margin: 0 0 20px;
+  font-size: 15.5px;
+  line-height: 1.6;
+  color: var(--on-surface-variant);
+  max-width: 56ch;
+}
+
+.invite__form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px 20px;
+  align-items: start;
+}
+
+.invite__roles {
+  grid-column: 1 / -1;
+  border: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.invite__roles legend {
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--on-surface);
+  padding: 0;
+  margin-bottom: 8px;
+}
+
+.invite__role {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  align-items: center;
+  padding: 14px 16px;
+  background: var(--surface-low);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-row);
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.invite__role:hover {
+  background: var(--surface-mid);
+}
+
+.invite__role--on {
+  border-color: var(--primary);
+  background: rgba(255, 219, 208, 0.32);
+}
+
+.invite__role input {
+  accent-color: var(--primary);
+  margin: 0;
+}
+
+.invite__role-name {
+  font-family: var(--serif);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--on-surface);
+}
+
+.invite__role-help {
+  grid-column: 2;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--on-surface-variant);
+}
+
+.invite__form .button {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
+/* Says what actually happens next, including the part that doesn't. */
+.invite__done {
+  margin: 20px 0 0;
+  padding: 14px 16px;
+  background: var(--sage);
+  border: 1px solid var(--sage-outline);
+  border-radius: var(--r-row);
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--on-sage);
+  max-width: 68ch;
+}
+
+.family__group {
+  margin-top: 30px;
+}
+
+.family__heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.family__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--surface-lowest);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-row);
+  overflow: hidden;
+}
+
+.family__row {
+  display: grid;
+  grid-template-columns: minmax(200px, 1.4fr) auto minmax(180px, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding: 15px 20px;
+}
+
+.family__row + .family__row {
+  border-top: 1px solid var(--hairline);
+}
+
+.family__who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.family__name {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--on-surface);
+}
+
+.family__you {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--outline);
+}
+
+.family__email {
+  font-size: 13.5px;
+  color: var(--on-surface-variant);
+  overflow-wrap: anywhere;
+}
+
+.family__since {
+  font-size: 13.5px;
+  color: var(--outline);
+  text-align: right;
+}
+
+@media (max-width: 700px) {
+  .family__row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .family__since {
+    text-align: left;
+  }
+}
+
+/* The way in for anyone who was invited: their account has no password yet. */
+.signin__reset {
+  align-self: flex-start;
+  margin-top: 16px;
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--on-ink-muted);
+  background: none;
+  border: none;
+  padding: 4px 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.signin__reset:hover:not(:disabled) {
+  color: var(--on-ink);
+}
+
+.signin__reset:disabled {
+  opacity: 0.5;
+  cursor: default;
 }

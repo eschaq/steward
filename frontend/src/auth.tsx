@@ -10,6 +10,7 @@ import {
 } from 'react'
 import {
   onAuthStateChanged,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
   type User,
@@ -24,6 +25,13 @@ interface AuthState {
   /** False once Firebase has told us whether a session was restored. */
   loading: boolean
   signIn: (email: string, password: string) => Promise<void>
+  /** Ask Firebase to email a link for setting a password.
+   *
+   * This is how an invited person gets in for the first time. An invite creates
+   * their Auth account with no password at all, so there is nothing for them to
+   * type until they've been through this — and they can't self-register the
+   * address either, because it already exists. */
+  sendResetEmail: (email: string) => Promise<void>
   leave: () => Promise<void>
 }
 
@@ -45,6 +53,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       signIn: async (email, password) => {
         await signInWithEmailAndPassword(auth, email, password)
+      },
+      sendResetEmail: async (email) => {
+        await sendPasswordResetEmail(auth, email)
       },
       leave: async () => {
         await signOut(auth)

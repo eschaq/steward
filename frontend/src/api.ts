@@ -11,6 +11,8 @@ import type {
   Item,
   ItemListResponse,
   Me,
+  MemberListResponse,
+  Membership,
   Message,
   MessageListResponse,
   DispositionChoice,
@@ -132,6 +134,39 @@ export async function postEstateMessage(
 export async function fetchMe(estateId: string): Promise<Me> {
   const response = await authorizedFetch(`/estates/${encodeURIComponent(estateId)}/me`)
   return (await response.json()) as Me
+}
+
+export async function fetchMembers(estateId: string): Promise<MemberListResponse> {
+  const response = await authorizedFetch(`/estates/${encodeURIComponent(estateId)}/members`)
+  return (await response.json()) as MemberListResponse
+}
+
+/** Invite someone to the estate.
+ *
+ * `create_account` is always true from here: a membership row has to point at a
+ * Firebase Auth uid, and the person an executor is inviting has, by definition,
+ * never used Steward. The endpoint defaults it off for scripts; from the UI,
+ * filling in this form *is* the deliberate act it guards.
+ */
+export async function inviteToEstate(
+  estateId: string,
+  invite: { email: string; role: 'executor' | 'beneficiary'; display_name?: string },
+): Promise<Membership> {
+  const response = await authorizedFetch(
+    `/estates/${encodeURIComponent(estateId)}/invite`,
+    { method: 'POST', body: { ...invite, create_account: true } },
+  )
+  return (await response.json()) as Membership
+}
+
+/** Accept the invite waiting on this estate. Idempotent server-side; the
+ * response says whether this call is what actually flipped it. */
+export async function acceptInvite(estateId: string): Promise<Membership> {
+  const response = await authorizedFetch(
+    `/estates/${encodeURIComponent(estateId)}/accept`,
+    { method: 'POST' },
+  )
+  return (await response.json()) as Membership
 }
 
 export async function fetchItemResolution(

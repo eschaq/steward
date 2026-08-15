@@ -152,6 +152,7 @@ The equality assertions compare against `messages.py`'s own copy functions, so
 | `POST /estates/{id}/invite`           | executor                   | `invite_to_estate`             |
 | `POST /estates/{id}/accept`           | the invitee themselves     | `accept_invite`                |
 | `GET  /estates/{id}/items`            | any accepted member        | `list_items_for_estate`        |
+| `GET  /estates/{id}/members`          | any accepted member        | `list_memberships` + `users`   |
 | `GET  /estates/{id}/review`           | any accepted member        | composes items + claims + resolutions + dispositions |
 | `GET  /items/{id}`                    | any accepted member        | `get_item`                     |
 | `GET  /items/{id}/messages`           | any accepted member        | `get_messages_for_item`        |
@@ -167,6 +168,35 @@ The equality assertions compare against `messages.py`'s own copy functions, so
 | `POST /items/{id}/photo`              | executor                   | `store_item_photo`             |
 | `POST /items/{id}/marketplace-listing`| executor                   | `recommend_channel`            |
 | `POST /items/{id}/agent-message`      | any accepted member        | `run_behavior_for_item`        |
+
+### What an invited person can actually do
+
+Worth being exact about, because the answer is not "they get an email and click
+it". Probed against real Firebase Auth:
+
+```
+executor invites ruth@example.com (create_account: true)
+  -> auth.create_user(email=...)      providers: (none)   no password
+  -> signInWithPassword               400 INVALID_LOGIN_CREDENTIALS
+  -> self sign-up, same address       400 EMAIL_EXISTS
+  -> generate_password_reset_link     OK
+  -> sendOobCode PASSWORD_RESET       200, email sent by Firebase
+  -> resetPassword with that oobCode  200, password set
+  -> signInWithPassword               200, signed in
+```
+
+So: **the invite claims the address**, which means the invitee cannot register
+it themselves, and it leaves them an account with no password and no way in
+until someone tells them to use the reset flow. Steward sends **no invitation
+email** — that would need an email service and is not built. Firebase does send
+the password-reset email itself, with no SMTP configuration, which is what makes
+the rest of the path real.
+
+The frontend closes this the only way it can without an email service: the
+Family screen tells the executor plainly that they have to pass the word along,
+and the sign-in screen carries a "Forgot your password?" control that is
+explicitly labelled as how a newly-invited person sets a password the first
+time.
 
 ### Authentication
 
@@ -206,7 +236,25 @@ a dashboard card that conflates them would be lying about which it is showing.
 The channel alone — no platform, no reason — because a card that needs those has
 an item page one click away.
 
-`GET /estates/{id}/me` returns the caller's role on an estate, and is
+`GET /estates/{id}/members` is everyone invited here, accepted or still
+pending, ordered by when they were asked. Readable by any accepted member — who
+else is in this with you is not privileged information inside a family — while
+inviting stays executor-only. Names and emails are resolved from the `users`
+mirror in one batched `get_all`, because a membership row holds only a uid and
+the frontend cannot read that collection.
+
+`POST /estates/{id}/accept` returns `first_accept` — true only for the call
+that actually turned a pending invite into a membership. It is read before the
+write (`get_membership`, then `accept_invite`) rather than stored as a flag:
+EstateMembership's fields are fixed by the data model doc, and "have they been
+welcomed yet" was already answerable from whether `accepted_at` was still null.
+Accepting is idempotent, so every later call reports `false`. That is what the
+frontend's one-time welcome hangs on.
+
+`GET /estates/{id}/me` also carries `estate_name` (so a screen can say "Seed
+Estate" rather than print `seed-estate-001` at a grieving family — null if the
+record has no name) and `invite_pending`, which is what lets the client offer
+acceptance instead of a bare "you have no role here". It is
 deliberately **not** a 403 for a non-member — "you have no role here" is a fact
 the UI needs in order to say so plainly. It governs what is *offered*, never
 what is *allowed*; every write still goes through `require_role`.

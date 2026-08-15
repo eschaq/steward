@@ -57,17 +57,20 @@ from membership import (
     accept_invite,
     create_auth_user,
     invite_to_estate,
+    list_memberships,
     require_role,
 )
 from models import (
     Claim,
     Disposition,
+    Estate,
     Item,
     MarketplaceListing,
     Message,
     Resolution,
     ResolutionType,
     SuggestedDisposition,
+    User,
 )
 from resolutions import ResolutionError, get_resolution, resolve_item
 
@@ -182,6 +185,10 @@ class MembershipResponse(BaseModel):
     user_id: str
     role: str
     accepted: bool
+    # True only when *this* call is what turned a pending invite into a
+    # membership — the one moment someone is genuinely new here. Accepting is
+    # idempotent, so a second call comes back False.
+    first_accept: bool = False
 
 
 class MeResponse(BaseModel):
@@ -198,6 +205,12 @@ class MeResponse(BaseModel):
     # accepted it — a pending invite grants no role.
     role: Optional[str] = None
     accepted: bool = False
+    # The estate's own name, so a screen can say "your mother's house" rather
+    # than print a document id at someone. Null if the estate record is missing.
+    estate_name: Optional[str] = None
+    # True when there is an invite here waiting to be accepted — what the client
+    # needs in order to offer acceptance rather than a bare "no role here".
+    invite_pending: bool = False
 
 
 class ResolutionDetail(BaseModel):
@@ -388,6 +401,28 @@ class ReviewRow(BaseModel):
     disposition: Optional[DispositionDetail] = None
 
 
+class MemberResponse(BaseModel):
+    """One person on the estate, as the executor's list needs them."""
+
+    user_id: str
+    display_name: str
+    email: str
+    role: str
+    accepted: bool
+    invited_at: datetime
+    accepted_at: Optional[datetime] = None
+    # So the list can say "you" rather than the reader's own name back at them.
+    is_you: bool = False
+
+
+class MemberListResponse(BaseModel):
+    estate_id: str
+    count: int
+    # How many are still waiting — the number the executor is actually watching.
+    pending_count: int
+    members: list[MemberResponse]
+
+
 class ReviewResponse(BaseModel):
     estate_id: str
     count: int
@@ -450,7 +485,14 @@ def post_accept(estate_id: str, uid: CallerUid) -> MembershipResponse:
 
     firestore.rules lets only the executor write a membership row, so this
     endpoint is the path an invitee has to take.
+
+    `first_accept` says whether this call is the one that flipped the invite.
+    Read before the write rather than stored as a flag: EstateMembership's
+    fields are fixed by the data model doc, and "have they been welcomed yet"
+    is already answerable from `accepted_at` being null. Accepting is
+    idempotent, so every later call reports False.
     """
+    before = get_membership(estate_id, uid)
     try:
         membership = accept_invite(estate_id, uid)
     except MembershipError as exc:
@@ -462,6 +504,7 @@ def post_accept(estate_id: str, uid: CallerUid) -> MembershipResponse:
         user_id=membership.user_id,
         role=membership.role.value,
         accepted=membership.accepted_at is not None,
+        first_accept=before is not None and before.accepted_at is None,
     )
 
 
@@ -484,7 +527,40 @@ def get_my_standing(estate_id: str, uid: CallerUid) -> MeResponse:
         # A pending invite grants no role — same rule get_role() applies.
         role=membership.role.value if (membership and accepted) else None,
         accepted=accepted,
+        estate_name=_estate_name(estate_id),
+        invite_pending=bool(membership) and not accepted,
     )
+
+
+def _users_by_id(user_ids: list[str]) -> dict[str, dict]:
+    """The `users` mirror for a set of uids, in one batched read.
+
+    A membership row holds only a uid, and the frontend cannot read `users`, so
+    names and emails have to be resolved here.
+    """
+    if not user_ids:
+        return {}
+    db = get_db()
+    refs = [db.collection(User.COLLECTION).document(uid) for uid in set(user_ids)]
+    return {
+        snapshot.id: (snapshot.to_dict() or {})
+        for snapshot in db.get_all(refs)
+        if snapshot.exists
+    }
+
+
+def _estate_name(estate_id: str) -> Optional[str]:
+    """The estate's display name, or None if there is no such record.
+
+    One small read, on a call the client already makes once per screen. None
+    rather than the id: a screen that has no name to show should say something
+    general, not print `seed-estate-001` at a grieving family.
+    """
+    snapshot = get_db().collection(Estate.COLLECTION).document(estate_id).get()
+    if not snapshot.exists:
+        return None
+    name = (snapshot.to_dict() or {}).get("name")
+    return str(name) if name else None
 
 
 def _as_listing_detail(listing: Optional[MarketplaceListing]) -> Optional[ListingDetail]:
@@ -650,6 +726,51 @@ def get_item_resolution(item_id: str, uid: CallerUid) -> Optional[ResolutionDeta
         ),
         notes=resolution.notes,
         resolved_at=resolution.resolved_at,
+    )
+
+
+@app.get("/estates/{estate_id}/members", response_model=MemberListResponse)
+def get_estate_members(estate_id: str, uid: CallerUid) -> MemberListResponse:
+    """Everyone invited to this estate, accepted or still pending.
+
+    Readable by any accepted member, like every other read here: who else is in
+    this with you is not privileged information within a family. Inviting is
+    still executor-only.
+
+    Names and emails come from the `users` mirror in one batched read — the
+    frontend cannot read that collection, and a membership row holds only a uid.
+    """
+    try:
+        require_role(uid, estate_id)
+    except MembershipError as exc:
+        raise _forbidden(exc) from exc
+
+    memberships = list_memberships(estate_id)
+    people = _users_by_id([m.user_id for m in memberships])
+
+    members = []
+    for membership in memberships:
+        person = people.get(membership.user_id)
+        members.append(
+            MemberResponse(
+                user_id=membership.user_id,
+                # A membership can outlive its user mirror; say so rather than
+                # rendering a blank row.
+                display_name=(person or {}).get("display_name") or "Someone",
+                email=(person or {}).get("email") or "",
+                role=membership.role.value,
+                accepted=membership.accepted_at is not None,
+                invited_at=membership.invited_at,
+                accepted_at=membership.accepted_at,
+                is_you=membership.user_id == uid,
+            )
+        )
+
+    return MemberListResponse(
+        estate_id=estate_id,
+        count=len(members),
+        pending_count=sum(1 for m in members if not m.accepted),
+        members=members,
     )
 
 

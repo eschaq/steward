@@ -11,7 +11,7 @@ import { StewardMark } from './StewardMark'
 export function EstateNav({
   active,
 }: {
-  active: 'inventory' | 'messages' | 'review'
+  active: 'inventory' | 'messages' | 'review' | 'family'
 }) {
   return (
     <nav className="estate-nav" aria-label="Estate">
@@ -41,6 +41,13 @@ export function EstateNav({
         aria-current={active === 'review' ? 'page' : undefined}
       >
         Review
+      </NavLink>
+      <NavLink
+        to="/family"
+        className="estate-nav__link"
+        aria-current={active === 'family' ? 'page' : undefined}
+      >
+        Family
       </NavLink>
     </nav>
   )

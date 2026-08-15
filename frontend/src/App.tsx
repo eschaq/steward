@@ -1,12 +1,74 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { useCallback, useEffect, useState } from 'react'
+import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 
+import { acceptInvite, fetchMe } from './api'
 import { AuthProvider, useAuth } from './auth'
+import { ESTATE_ID } from './firebase'
+import type { Me } from './types'
 import { Dashboard } from './screens/Dashboard'
+import { Family } from './screens/Family'
 import { ItemDetail } from './screens/ItemDetail'
 import { MessageCenter } from './screens/MessageCenter'
 import { ResolveItem } from './screens/ResolveItem'
 import { Review } from './screens/Review'
 import { SignIn } from './screens/SignIn'
+import { Welcome } from './screens/Welcome'
+
+/** What happens between signing in and the inventory.
+ *
+ * Someone with an invite still waiting has it accepted for them here — there is
+ * nothing to decide, they already followed the link — and if that acceptance is
+ * what flipped a pending invite, they are new, and get shown around once.
+ *
+ * The "once" is the server's answer, not a stored flag: `first_accept` is true
+ * only for the call that actually flipped `accepted_at`. EstateMembership's
+ * fields are fixed by the data model doc, and "have they been welcomed" was
+ * already answerable from whether the invite was still pending. Every later
+ * sign-in accepts nothing, so it comes back false and lands on the dashboard.
+ */
+function Arrival({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate()
+  const [me, setMe] = useState<Me | null>(null)
+  const [checked, setChecked] = useState(false)
+  const [welcoming, setWelcoming] = useState(false)
+
+  const arrive = useCallback(async () => {
+    try {
+      let standing = await fetchMe(ESTATE_ID)
+      if (standing.invite_pending) {
+        const accepted = await acceptInvite(ESTATE_ID)
+        standing = await fetchMe(ESTATE_ID)
+        if (accepted.first_accept) setWelcoming(true)
+      }
+      setMe(standing)
+    } catch {
+      // A failure here is not worth a wall in front of the app: the screens
+      // each ask for their own standing and say plainly what they find.
+    } finally {
+      setChecked(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    void arrive()
+  }, [arrive])
+
+  // Held rather than flashed: showing the dashboard for a beat and then
+  // replacing it with a welcome is worse than a moment of nothing.
+  if (!checked) return null
+  if (welcoming && me) {
+    return (
+      <Welcome
+        me={me}
+        onDone={() => {
+          setWelcoming(false)
+          navigate('/', { replace: true })
+        }}
+      />
+    )
+  }
+  return <>{children}</>
+}
 
 /** Signed out, there is one screen and it isn't addressable. Signed in, items
  * have real URLs — a contested piece is a thing a family will send each other a
@@ -20,14 +82,17 @@ function Routed() {
   if (!user) return <SignIn />
 
   return (
+    <Arrival>
     <Routes>
       <Route path="/" element={<Dashboard />} />
       <Route path="/items/:itemId" element={<ItemDetail />} />
       <Route path="/items/:itemId/resolve" element={<ResolveItem />} />
       <Route path="/messages" element={<MessageCenter />} />
       <Route path="/review" element={<Review />} />
+      <Route path="/family" element={<Family />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </Arrival>
   )
 }
 

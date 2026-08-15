@@ -13,15 +13,55 @@ backend and real Firebase Auth — there is no mock data anywhere in here.
 | `src/types.ts`                | Item shape, and all six statuses with their meanings |
 | `src/index.css`               | The design system as CSS custom properties          |
 | `src/screens/SignIn.tsx`      | Email/password sign-in                              |
+| `src/screens/Welcome.tsx`     | The one-time walkthrough a new member sees          |
 | `src/screens/Dashboard.tsx`   | Inventory grid, status filters                      |
 | `src/screens/ItemDetail.tsx`  | One item: placard, facts, claim action, where it goes, thread |
 | `src/screens/MessageCenter.tsx` | The estate-wide unified feed, and composing to it |
 | `src/screens/ResolveItem.tsx` | The executor's decision screen                    |
 | `src/screens/Review.tsx`      | The executor's bulk review table                  |
+| `src/screens/Family.tsx`      | Who else is here, and the invite form              |
 | `src/components/`             | `ItemCard`, `StatusChip`, `StatusFilters`, `StewardMark`, `Claimants`, `MessageThread`, `Disposition` |
 | `public/brand/`               | Hero photography (greyscale; duotoned in CSS)       |
 | `mockups/`                    | Design comps — not built, not served                |
 | `verify.mjs`                  | Drives the real app in a real browser (Playwright)  |
+
+## Arriving
+
+`<Arrival>` wraps the signed-in routes. It asks `GET /estates/{id}/me` once; if
+an invite is still pending it accepts it — there is nothing to decide, the
+person already followed the link — and if that acceptance is what flipped the
+invite, they are new here and get shown around.
+
+**"Once" is the server's answer, not a stored flag.** `POST /accept` returns
+`first_accept`, true only for the call that actually flipped `accepted_at`.
+EstateMembership's fields are fixed by the data model doc, and "have they been
+welcomed" was already answerable from whether the invite was pending, so no new
+field was invented. Every later sign-in accepts nothing and lands on the
+dashboard. The trade-off worth naming: someone who reloads mid-walkthrough
+doesn't get it back — a reload reads as a skip. For a first-run walkthrough
+that's the right way round, and skipping is an offered option anyway.
+
+A failed `/me` here doesn't put a wall in front of the app. Each screen asks for
+its own standing and says plainly what it finds; the gate just gets out of the
+way.
+
+## The welcome
+
+Three steps for everyone, four for an executor. On Ink, like sign-in — DESIGN.md
+reserves the dark surface for arrival moments, and this is the other one.
+
+The order is deliberate: what this is, then the thing they'll do first (ask for
+something), then the thing they're most likely to be afraid of (someone else
+asking too). *"It happens, and it isn't a fight."* That reassurance has to land
+before they meet a contested item, not after. The executor's fourth step says
+the final call is theirs to record and that Steward suggests but doesn't decide.
+
+- **The estate names itself.** "This is Seed Estate", pulled from
+  `me.estate_name`, falling back to "the estate" rather than a document id.
+- **Skippable from every step** — "Skip, I'll figure it out". Some people just
+  want to go and look at the list.
+- **Place-markers, not a progress bar.** Three dots, no percentage, nothing to
+  complete. Counts are a ledger, not a score.
 
 ## The screens
 
@@ -33,6 +73,7 @@ backend and real Firebase Auth — there is no mock data anywhere in here.
 | `/messages`       | Message Center | The estate-wide unified feed, and composing to it. |
 | `/items/:itemId/resolve` | Contested resolution | Executor-only: record how a claimed or contested item was settled. |
 | `/review`         | Review table   | Executor-only: every item on one page, grouped by what needs deciding. |
+| `/family`         | Family         | Who's here and who's still waiting; the executor can ask someone new in. |
 
 All six are wired to the real backend against real Firestore. There is no mock
 data anywhere in here.
@@ -441,6 +482,37 @@ The nav link is shown to everyone; the screen itself explains that working
 through the estate this way is the executor's job, and points a beneficiary back
 to the inventory. Hiding the link would leave them wondering what they were
 missing.
+
+## Asking someone in
+
+`/family` — a screen of its own rather than a modal on the dashboard, because
+the list is a standing thing an executor comes back to ("has she signed in
+yet?"), not a one-off action. It's also the fourth place the redesign always
+had, next to Inventory, Messages and Review.
+
+Everyone reads the list; only the executor sees the form. Two groups, **Waiting
+to come in** and **Here** — a pending invite is a real answer, not a missing
+one, and the executor's actual question is which of those two a person is in.
+
+The form sends `create_account: true`. The endpoint defaults it off so a script
+can't quietly mint accounts; from the UI, filling in this form *is* the
+deliberate act that guard exists for.
+
+### What actually happens to the person you invited
+
+Not "they get an email and click it" — Steward sends no invitation email, and
+that's said on the screen rather than implied away. What an invite really does
+is create a Firebase Auth account with **no password**, which also means the
+address can no longer be self-registered.
+
+So the sign-in screen carries **"Forgot your password?"**, labelled for exactly
+this: *"Just been invited? Put your email above and use that link — it's how you
+set a password the first time."* Firebase sends that email itself, no SMTP
+needed. They set a password, sign in, `<Arrival>` accepts the waiting invite,
+and the welcome runs. Verified end to end.
+
+The honest gap: the executor has to tell them the site exists. Everything after
+that works.
 
 ## Photographs
 

@@ -156,6 +156,23 @@ def get_membership(estate_id: str, user_id: str) -> Optional[EstateMembership]:
     return EstateMembership.model_validate(snapshot.to_dict())
 
 
+def list_memberships(estate_id: str) -> list[EstateMembership]:
+    """Everyone invited to this estate, accepted or still pending.
+
+    Ordered by when they were invited, so the executor reads it as the history
+    of who they asked and in what order. A pending row is a real answer, not a
+    missing one — `accepted_at is None` is the whole of "hasn't come in yet".
+    """
+    snapshots = (
+        get_db()
+        .collection(EstateMembership.COLLECTION)
+        .where(filter=gcf.FieldFilter("estate_id", "==", estate_id))
+        .get()
+    )
+    memberships = [EstateMembership.model_validate(s.to_dict()) for s in snapshots]
+    return sorted(memberships, key=lambda m: m.invited_at)
+
+
 def get_role(
     uid: str, estate_id: str, include_pending: bool = False
 ) -> Optional[MembershipRole]:
