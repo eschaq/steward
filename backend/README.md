@@ -24,6 +24,7 @@ authentication, which is what Cloud Run serves.
 | `dispositions.py`    | Executor's final call: writes the Disposition row + OverrideLog  |
 | `photos.py`          | Item photographs in Cloud Storage                                |
 | `marketplace.py`     | **Tier 2** — which marketplace to sell on, and why                |
+| `mailer.py`          | The invitation email, over Gmail SMTP. Best-effort, never a gate  |
 | `init_firestore.py`  | Seeds one document per collection and reads it back             |
 | `seed_demo_items.py` | Demo inventory for the dashboard — **not** a test fixture       |
 | `test_membership.py` | Script: invite + accept two users, print each role              |
@@ -169,10 +170,46 @@ The equality assertions compare against `messages.py`'s own copy functions, so
 | `POST /items/{id}/marketplace-listing`| executor                   | `recommend_channel`            |
 | `POST /items/{id}/agent-message`      | any accepted member        | `run_behavior_for_item`        |
 
+### The invitation email
+
+`POST /estates/{id}/invite` generates a real Firebase password-reset link with
+the Admin SDK and emails it, over Gmail SMTP with an app password from
+`backend/.env` (`GMAIL_ADDRESS`, `GMAIL_APP_PASSWORD` — gitignored, and read by
+a twelve-line loader in `mailer.py` rather than reinstating `python-dotenv`,
+which this project dropped when classification moved to Vertex AI).
+
+**The email is a courtesy on top of the membership, never a gate in front of
+it.** Everything after `invite_to_estate` is best-effort: no credentials, a
+rejected SMTP login, a dropped connection, or a link that could not be
+generated all come back as `invite_email_sent: false` plus a plain
+`invite_email_note`, and the invite still succeeds with a 200. `send_invite_email`
+has no exception path at all — a mail server having a bad day must not stop a
+family adding someone to their own estate. Verified both ways:
+
+```
+credentials unset  -> sent=False  "No email was sent — this copy of Steward has
+                                   no mail account set up. You'll need to pass
+                                   the word along yourself."
+wrong app password -> sent=False  "The invite is recorded, but the email didn't
+                                   go out (SMTPAuthenticationError). Worth
+                                   telling them yourself."
+```
+
+`STEWARD_APP_URL` becomes the link's `continueUrl`, so the invitee is returned
+to Steward once the password is set. That domain has to be on the project's
+authorized-domains list — `localhost` was added for local work. If it isn't,
+`_invite_link` logs it and falls back to a link with no continue URL rather than
+giving up: a link that sets a password but doesn't offer a way onward is far
+better than no link.
+
+The subject is "You've been asked to {estate name}" and the body names who
+asked. No "You have been invited to join a workspace", nothing about activating
+an account, and a closing line that says there is no hurry.
+
 ### What an invited person can actually do
 
-Worth being exact about, because the answer is not "they get an email and click
-it". Probed against real Firebase Auth:
+Worth being exact about, because Firebase's own behaviour is what shapes the
+flow. Probed against real Firebase Auth:
 
 ```
 executor invites ruth@example.com (create_account: true)
@@ -192,11 +229,24 @@ email** — that would need an email service and is not built. Firebase does sen
 the password-reset email itself, with no SMTP configuration, which is what makes
 the rest of the path real.
 
-The frontend closes this the only way it can without an email service: the
-Family screen tells the executor plainly that they have to pass the word along,
-and the sign-in screen carries a "Forgot your password?" control that is
-explicitly labelled as how a newly-invited person sets a password the first
-time.
+So the invite claims the address — the invitee cannot register it themselves —
+and leaves them an account with no password. `mailer.py` closes that: the link
+they need is now emailed to them the moment they are invited. The sign-in
+screen's "Forgot your password?" control remains as the way back in if the
+email never arrives or the link goes stale.
+
+Verified end to end against a real inbox, through the real endpoint, using the
+exact link that was sent:
+
+```
+POST /invite  ->  200, invite_email_sent: true
+  subject      "You've been asked to Seed Estate"
+  link mode    resetPassword     continueUrl  http://localhost:5173
+1. sign in before the link  -> 400 INVALID_LOGIN_CREDENTIALS
+2. follow the emailed link  -> 200 password set
+3. sign in after the link   -> 200 signed in
+4. membership               -> pending; <Arrival> accepts it and runs the welcome
+```
 
 ### Authentication
 

@@ -22,8 +22,10 @@ Firestore directly (CLAUDE.md's trust boundary).
 from datetime import datetime
 from typing import Optional
 
+import logging
 import os
 
+from firebase_admin import auth
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -32,6 +34,7 @@ from google.cloud.firestore_v1.base_query import FieldFilter
 
 from agent import AgentError, run_behavior_for_item
 from firebase_app import get_db
+from mailer import SendResult, send_invite_email
 from auth_deps import CallerUid
 from claims import ClaimError, get_claims_for_item, record_claim
 from dispositions import (
@@ -73,6 +76,8 @@ from models import (
     User,
 )
 from resolutions import ResolutionError, get_resolution, resolve_item
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Steward",
@@ -185,6 +190,11 @@ class MembershipResponse(BaseModel):
     user_id: str
     role: str
     accepted: bool
+    # Whether the invitation email actually went out, and what to say about it.
+    # Both are courtesies reported on top of the membership — an invite that
+    # could not be emailed is still an invite.
+    invite_email_sent: bool = False
+    invite_email_note: Optional[str] = None
     # True only when *this* call is what turned a pending invite into a
     # membership — the one moment someone is genuinely new here. Accepting is
     # idempotent, so a second call comes back False.
@@ -455,9 +465,53 @@ def healthz() -> dict[str, str]:
 # --- membership -------------------------------------------------------------
 
 
+def _invite_link(email: str) -> Optional[str]:
+    """A real Firebase action link for setting a password.
+
+    The same link the "Forgot your password?" control produces, generated here
+    so the invitee is told about it rather than having to be told to go looking
+    for it. `continueUrl` sends them on to Steward once the password is set,
+    when STEWARD_APP_URL names somewhere to send them.
+
+    None on failure — the invite still stands, there is just nothing to email.
+    """
+    app_url = os.environ.get("STEWARD_APP_URL", "").strip()
+    if app_url:
+        try:
+            return auth.generate_password_reset_link(
+                email,
+                action_code_settings=auth.ActionCodeSettings(
+                    url=app_url, handle_code_in_app=False
+                ),
+            )
+        except Exception:  # noqa: BLE001
+            # Most often UNAUTHORIZED_DOMAIN: STEWARD_APP_URL has to be on the
+            # project's authorized-domains list. A link that sets a password but
+            # doesn't offer a way onward is far better than no link, so fall
+            # through rather than give up.
+            logger.warning(
+                "invite link for %s could not carry a continue URL (%s); "
+                "sending a plain one",
+                email,
+                app_url,
+                exc_info=True,
+            )
+    try:
+        return auth.generate_password_reset_link(email)
+    except Exception:  # noqa: BLE001 — a courtesy that failed, not a failed invite
+        logger.exception("could not generate an invite link for %s", email)
+        return None
+
+
 @app.post("/estates/{estate_id}/invite", response_model=MembershipResponse)
 def post_invite(estate_id: str, body: InviteRequest, uid: CallerUid) -> MembershipResponse:
-    """Invite someone to an estate. Executor only."""
+    """Invite someone to an estate, and email them the way in. Executor only.
+
+    The membership is the source of truth; the email is a courtesy on top of it.
+    Everything after `invite_to_estate` is best-effort and reported rather than
+    raised — a mail server having a bad day must not stop a family from adding
+    someone to their own estate.
+    """
     try:
         require_role(uid, estate_id, MembershipRole.EXECUTOR)
         if body.create_account:
@@ -466,11 +520,30 @@ def post_invite(estate_id: str, body: InviteRequest, uid: CallerUid) -> Membersh
     except MembershipError as exc:
         raise _forbidden(exc) from exc
 
+    link = _invite_link(body.email)
+    if link is None:
+        result = SendResult(
+            False,
+            "The invite is recorded, but Steward couldn't produce a sign-in link "
+            "for them. Worth telling them yourself.",
+        )
+    else:
+        people = _users_by_id([uid])
+        result = send_invite_email(
+            to_email=body.email,
+            link=link,
+            estate_name=_estate_name(estate_id) or "the estate",
+            display_name=body.display_name,
+            inviter_name=(people.get(uid) or {}).get("display_name"),
+        )
+
     return MembershipResponse(
         estate_id=membership.estate_id,
         user_id=membership.user_id,
         role=membership.role.value,
         accepted=membership.accepted_at is not None,
+        invite_email_sent=result.sent,
+        invite_email_note=result.note,
     )
 
 
