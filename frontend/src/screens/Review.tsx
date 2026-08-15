@@ -97,7 +97,7 @@ export function Review() {
   const isExecutor = me?.role === 'executor'
 
   return (
-    <div className="page">
+    <main className="page">
       <header className="hero hero--slim">
         <div className="hero__top">
           <EstateNav active="review" />
@@ -176,6 +176,9 @@ export function Review() {
                             <img
                               className="review__thumb"
                               src={row.photo_url}
+                              // Decorative: the item's name is the very next
+                              // thing in this cell, so alt text here would make
+                              // a screen reader announce it twice.
                               alt=""
                               loading="lazy"
                             />
@@ -276,6 +279,6 @@ export function Review() {
           })}
         </>
       )}
-    </div>
+    </main>
   )
 }

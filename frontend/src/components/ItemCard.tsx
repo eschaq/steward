@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 
-import { CHANNEL_SHORT, firstPhoto, type Item } from '../types'
+import { CHANNEL_SHORT, firstPhoto, photoAlt, type Item } from '../types'
 import { StatusChip } from './StatusChip'
 
 function titleCase(value: string): string {
@@ -28,7 +28,7 @@ export function ItemCard({ item }: { item: Item }) {
     <Link to={`/items/${item.id}`} className="card">
       <div className={`card__photo${usable ? '' : ' card__photo--empty'}`}>
         {usable ? (
-          <img src={photo} alt={item.ai_category} loading="lazy" />
+          <img src={photo} alt={photoAlt(item)} loading="lazy" />
         ) : (
           <span>No photo yet</span>
         )}
@@ -44,7 +44,7 @@ export function ItemCard({ item }: { item: Item }) {
           </div>
         )}
 
-        <h3 className="card__title">{title}</h3>
+        <h2 className="card__title">{title}</h2>
         <p className="card__notes">{item.ai_condition_notes}</p>
 
         <div className="card__foot">

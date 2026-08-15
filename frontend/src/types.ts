@@ -27,6 +27,28 @@ export interface Item {
   decided_channel: string | null
 }
 
+/** What a screen reader should say about an item's photograph.
+ *
+ * The photo is the *only* thing on these screens a non-sighted reader cannot
+ * reach, so it carries the two facts the sighted reader gets from it: what the
+ * thing is, and what sort of state it's in. Both come from the classifier, and
+ * both are already on screen — but a caption below an image is not the image's
+ * description, and "item photo" tells nobody anything.
+ *
+ * Trimmed to one sentence of condition: alt text is announced in one breath,
+ * and the full notes sit in the body copy beneath for anyone who wants them.
+ */
+export function photoAlt(item: {
+  ai_category: string
+  ai_condition_notes?: string
+  ai_est_era_or_brand?: string | null
+}): string {
+  const era = item.ai_est_era_or_brand?.trim()
+  const thing = era ? `${item.ai_category} — ${era}` : item.ai_category
+  const first = (item.ai_condition_notes ?? '').split(/(?<=\.)\s+/)[0]?.trim()
+  return first ? `Photograph of a ${thing}. ${first}` : `Photograph of a ${thing}.`
+}
+
 export interface Claimant {
   claim_id: string
   user_id: string
@@ -191,6 +213,10 @@ export interface Membership {
   /** True only when this call is what turned a pending invite into a
    * membership — the one moment someone is genuinely new here. */
   first_accept: boolean
+  /** Whether the invitation email actually went out. A courtesy reported on top
+   * of the membership — an invite that couldn't be emailed is still an invite. */
+  invite_email_sent: boolean
+  invite_email_note: string | null
 }
 
 export interface Member {

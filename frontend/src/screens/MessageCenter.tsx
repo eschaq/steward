@@ -68,7 +68,7 @@ export function MessageCenter() {
   }
 
   return (
-    <div className="page">
+    <main className="page">
       <header className="hero hero--slim">
         <div className="hero__top">
           <EstateNav active="messages" />
@@ -134,6 +134,6 @@ export function MessageCenter() {
           />
         </section>
       )}
-    </div>
+    </main>
   )
 }

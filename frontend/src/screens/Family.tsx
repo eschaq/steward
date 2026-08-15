@@ -40,7 +40,11 @@ export function Family() {
   const [name, setName] = useState('')
   const [role, setRole] = useState<(typeof ROLES)[number]>('beneficiary')
   const [sending, setSending] = useState(false)
-  const [invited, setInvited] = useState<string | null>(null)
+  const [invited, setInvited] = useState<{
+    email: string
+    emailed: boolean
+    note: string | null
+  } | null>(null)
 
   const load = useCallback(async () => {
     setProblem(null)
@@ -72,13 +76,17 @@ export function Family() {
     setInvited(null)
     setSending(true)
     try {
-      await inviteToEstate(ESTATE_ID, {
+      const membership = await inviteToEstate(ESTATE_ID, {
         email: address,
         role,
         display_name: name.trim() || undefined,
       })
       setMembers((await fetchMembers(ESTATE_ID)).members)
-      setInvited(address)
+      setInvited({
+        email: address,
+        emailed: membership.invite_email_sent,
+        note: membership.invite_email_note,
+      })
       setEmail('')
       setName('')
     } catch (error) {
@@ -95,7 +103,7 @@ export function Family() {
   const here = (members ?? []).filter((m) => m.accepted)
 
   return (
-    <div className="page">
+    <main className="page">
       <header className="hero hero--slim">
         <div className="hero__top">
           <EstateNav active="family" />
@@ -190,16 +198,28 @@ export function Family() {
             </button>
           </form>
 
-          {/* Precise about which part is real: no invitation email goes out,
-              but the password link they'll need is a real one. Telling them
-              they'd been emailed would be the dishonest version. */}
+          {/* The server says what actually happened. A send that failed is
+              reported as a send that failed — never smoothed over, because the
+              executor is the only fallback and needs to know they are it. */}
           {invited && (
-            <p className="invite__done" role="status">
-              <strong>{invited}</strong> is on the list — but Steward won't email
-              them, so you'll need to tell them yourself. Send them the address of
-              this site and ask them to use <em>Forgot your password?</em> with
-              that email. They'll get a link to set a password, and after that
-              they can sign straight in.
+            <p
+              className={`invite__done${invited.emailed ? '' : ' invite__done--quiet'}`}
+              role="status"
+            >
+              {invited.emailed ? (
+                <>
+                  <strong>{invited.email}</strong> has been asked in, and an email
+                  is on its way to them with a link to set a password. Once they
+                  have, they'll show up under <em>Here</em>.
+                </>
+              ) : (
+                <>
+                  <strong>{invited.email}</strong> is on the list — that part is
+                  recorded and safe. {invited.note} They can also get in from the
+                  sign-in page with <em>Forgot your password?</em> and this
+                  address.
+                </>
+              )}
             </p>
           )}
         </section>
@@ -271,6 +291,6 @@ export function Family() {
           things are.
         </div>
       )}
-    </div>
+    </main>
   )
 }

@@ -500,19 +500,85 @@ deliberate act that guard exists for.
 
 ### What actually happens to the person you invited
 
-Not "they get an email and click it" — Steward sends no invitation email, and
-that's said on the screen rather than implied away. What an invite really does
-is create a Firebase Auth account with **no password**, which also means the
-address can no longer be self-registered.
+An invite creates a Firebase Auth account with **no password** — which also
+means the address can no longer be self-registered — and then emails them a real
+link to set one. They follow it, sign in, `<Arrival>` accepts the waiting
+invite, and the welcome runs.
 
-So the sign-in screen carries **"Forgot your password?"**, labelled for exactly
-this: *"Just been invited? Put your email above and use that link — it's how you
-set a password the first time."* Firebase sends that email itself, no SMTP
-needed. They set a password, sign in, `<Arrival>` accepts the waiting invite,
-and the welcome runs. Verified end to end.
+**The confirmation reports what actually happened**, because the server tells
+it. A send that worked says an email is on its way; a send that failed says so
+in the same breath as confirming the invite is safely recorded, and drops the
+sage treatment — a courtesy that didn't happen isn't a success. The executor is
+the only fallback, so they have to know when they're it.
 
-The honest gap: the executor has to tell them the site exists. Everything after
-that works.
+The sign-in screen keeps **"Forgot your password?"** — *"Just been invited? Put
+your email above and use that link — it's how you set a password the first
+time."* That is the way in if the email never arrives or the link goes stale.
+
+## Accessibility — WCAG 2.1 AA
+
+Ratios computed from the actual token values (WCAG relative-luminance formula,
+`rgba` tokens flattened over their real backdrop), not eyeballed. 32 pairings
+checked; 5 failed; all 5 fixed. Re-run: the audit script pattern is in the
+commit that added this section.
+
+**What failed and what it is now**
+
+| Pairing | Was | Now | Needs |
+| --- | --- | --- | --- |
+| `outline` text on `surface` | 4.25 | **5.60** | 4.5 |
+| `outline` text on `surface-lowest` | 4.46 | **5.89** | 4.5 |
+| `outline` text on `surface-high` (unclaimed chip) | 3.64 | **4.80** | 4.5 |
+| eyebrow (`outline`) on `surface` | 4.25 | **5.60** | 4.5 |
+| input border on field fill | 1.55 | **3.11** | 3.0 |
+
+Two token changes, both recorded in DESIGN.md: `outline` `#87736d` → `#71615c`,
+and a new `field-border` `#988782` for control edges (`outline-variant` was
+1.55:1 and stays as-is for decorative hairlines). Nothing else in the palette
+moved — Ink, clay, sage and every status fill passed as written, because the
+restraint in this design is in the fills and the text on them was already dark
+enough.
+
+Decorative hairlines sit at ~1.24:1 and stay there. 1.4.11 covers the boundaries
+of components and graphics needed to understand content; a divider between two
+paragraphs is neither.
+
+**Colour is never the only signal.** Each status chip carries a small drawn mark
+— open ring, filled ring, two overlapping rings, tick, arrow, question mark —
+so the six separate by shape as well as hue. Verified by rendering all six under
+`filter: grayscale(1)`: still distinguishable. The marks are `aria-hidden`; the
+chip's label already says the word.
+
+**Screen readers.** Confirmed against the live accessibility tree in Chromium,
+not read off the JSX — every screen was loaded and queried for interactive
+elements with no accessible name:
+
+```
+Sign in    main:1 nav:0 header:0   unnamed controls: none
+Dashboard  main:1 nav:1 header:1   unnamed controls: none
+Item       main:1 nav:0 header:1   unnamed controls: none
+Messages   main:1 nav:1 header:16  unnamed controls: none
+Review     main:1 nav:1 header:1   unnamed controls: none
+Family     main:1 nav:1 header:1   unnamed controls: none
+```
+
+The sixteen headers on Messages are each inside an `<article>`, so they are
+element headers rather than sixteen banner landmarks — correct as written.
+
+- **Every screen's wrapper is `<main>`**, so there is a main landmark to skip to.
+  They were all `<div className="page">`.
+- **Card titles moved `h3` → `h2`.** Under the page's `h1` they skipped a level,
+  which makes heading-by-heading navigation lie about the structure.
+- **`photoAlt()` in `types.ts`** builds the item photo's description from the
+  classifier's own output — the thing and its era, then the first sentence of
+  condition. The photo is the one thing on these screens a non-sighted reader
+  cannot otherwise reach, and "item photo" tells nobody anything. Live:
+  *"Photograph of a table lamp — brass, 1970s. Brass column lamp with a pleated
+  shade."* Trimmed to one sentence because alt text is announced in a single
+  breath; the full notes are in the body copy below.
+- **The review table's thumbnail keeps `alt=""`** — the item's name is the very
+  next thing in the cell, and describing it would make a screen reader say it
+  twice.
 
 ## Photographs
 

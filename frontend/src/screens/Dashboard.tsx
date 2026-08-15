@@ -64,7 +64,7 @@ export function Dashboard() {
     `ledger__block ledger__block--${count === 0 ? 'quiet' : colour}`
 
   return (
-    <div className="page">
+    <main className="page">
       <header className="hero">
         <div className="hero__top">
           <EstateNav active="inventory" />
@@ -163,6 +163,6 @@ export function Dashboard() {
           ))}
         </div>
       )}
-    </div>
+    </main>
   )
 }

@@ -138,7 +138,7 @@ export function ResolveItem() {
   const canDecide = isExecutor && !alreadyDecided
 
   return (
-    <div className="page">
+    <main className="page">
       <header className="hero hero--slim">
         <div className="hero__top">
           <EstateNav active="inventory" />
@@ -296,6 +296,6 @@ export function ResolveItem() {
           )}
         </>
       )}
-    </div>
+    </main>
   )
 }

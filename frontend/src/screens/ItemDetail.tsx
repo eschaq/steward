@@ -23,6 +23,7 @@ import { ESTATE_ID } from '../firebase'
 import {
   STATUS_MEANING,
   firstPhoto,
+  photoAlt,
   isClaimable,
   isItemStatus,
   type Claimant,
@@ -148,7 +149,7 @@ export function ItemDetail() {
   const claimable = Boolean(item && isClaimable(item.status))
 
   return (
-    <div className="page">
+    <main className="page">
       <header className="hero hero--slim">
         <div className="hero__top">
           <Link to="/" className="hero__back">
@@ -186,7 +187,7 @@ export function ItemDetail() {
           <article className={`placard${usablePhoto ? '' : ' placard--no-photo'}`}>
             <div className={`placard__photo${usablePhoto ? '' : ' card__photo--empty'}`}>
               {usablePhoto ? (
-                <img src={photo} alt={item.ai_category} />
+                <img src={photo} alt={photoAlt(item)} />
               ) : me?.role === 'executor' ? (
                 <label className="photo-add">
                   <input
@@ -295,6 +296,6 @@ export function ItemDetail() {
           </section>
         </>
       )}
-    </div>
+    </main>
   )
 }

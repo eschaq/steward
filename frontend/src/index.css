@@ -34,8 +34,18 @@
 
   --on-surface: #1f1b17;
   --on-surface-variant: #54433e;
-  --outline: #87736d;
+  /* Was #87736d, which read as quiet but measured 3.47–4.46:1 across the six
+     light surfaces — under AA for body text on every one of them. Darkened
+     along the same hue until the worst backdrop (surface-highest) clears 4.5.
+     See the accessibility section of DESIGN.md. */
+  --outline: #71615c;
+  /* Decorative hairlines and dashed edges only. Too light to bound a control —
+     use --field-border for anything a person types into or presses. */
   --outline-variant: #d9c1ba;
+  /* The boundary of an interactive control on a light surface. WCAG 1.4.11
+     wants 3:1 against what's on either side of it; outline-variant managed
+     1.55. */
+  --field-border: #988782;
   --hairline: rgba(135, 115, 109, 0.18);
 
   /* --- clay --- */
@@ -143,7 +153,9 @@ h3 {
  * pill. Uppercase and letterspaced so it reads as a catalogue mark. */
 
 .tag {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   border-radius: var(--r-tag);
   padding: 4px 9px;
   font-size: 11px;
@@ -304,7 +316,7 @@ h3 {
   padding: 0 18px;
   color: var(--on-surface);
   background: var(--surface-low);
-  border: 1px solid var(--outline-variant);
+  border: 1px solid var(--field-border);
   border-radius: var(--r-row);
 }
 
@@ -1402,7 +1414,7 @@ h3 {
   padding: 0 14px;
   color: var(--on-surface);
   background: var(--surface-low);
-  border: 1px solid var(--outline-variant);
+  border: 1px solid var(--field-border);
   border-radius: var(--r-row);
 }
 
@@ -2253,4 +2265,20 @@ h3 {
 .signin__reset:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* A courtesy that didn't happen isn't a success — same shape, no sage. */
+.invite__done--quiet {
+  background: var(--surface-mid);
+  border-color: var(--outline-variant);
+  color: var(--on-surface-variant);
+}
+
+/* The drawn status mark. Optically a touch smaller than the cap height so it
+   sits with the letters rather than shouting over them. */
+.status-mark {
+  flex: none;
+  width: 11px;
+  height: 11px;
+  opacity: 0.85;
 }
