@@ -153,6 +153,7 @@ The equality assertions compare against `messages.py`'s own copy functions, so
 | `POST /estates/{id}/invite`           | executor                   | `invite_to_estate`             |
 | `POST /estates/{id}/accept`           | the invitee themselves     | `accept_invite`                |
 | `GET  /estates/{id}/items`            | any accepted member        | `list_items_for_estate`        |
+| `POST /estates/{id}/items`            | executor                   | `store_item_photo` + `classify_bytes` + `create_item_from_classification` |
 | `GET  /estates/{id}/members`          | any accepted member        | `list_memberships` + `users`   |
 | `GET  /estates/{id}/review`           | any accepted member        | composes items + claims + resolutions + dispositions |
 | `GET  /items/{id}`                    | any accepted member        | `get_item`                     |
@@ -168,7 +169,75 @@ The equality assertions compare against `messages.py`'s own copy functions, so
 | `POST /items/{id}/disposition`        | executor                   | `record_disposition_decision`  |
 | `POST /items/{id}/photo`              | executor                   | `store_item_photo`             |
 | `POST /items/{id}/marketplace-listing`| executor                   | `recommend_channel`            |
+| `POST /items/{id}/remove`             | executor                   | `remove_item` (soft delete)    |
 | `POST /items/{id}/agent-message`      | any accepted member        | `run_behavior_for_item`        |
+
+### Taking an item off the list
+
+`POST /items/{id}/remove` is a **soft delete**: `status` moves to `removed` and
+nothing else changes. The document stays, its claims and messages stay attached,
+and the item stays readable at its own URL — deleting it would orphan everything
+pointing at it and leave the family a gap they cannot ask about. Visible state
+beats silent erasure.
+
+**POST, not DELETE.** DELETE promises the resource goes away, and it does not.
+Naming the action honestly beats borrowing a verb whose meaning is wrong here,
+and it matches the other action endpoints (`/claim`, `/resolve`,
+`/disposition`).
+
+**Idempotent, not an error.** Removing something already removed asks for a
+state it is already in, so there is nothing to refuse — the second call returns
+the same item and writes nothing. That matches `accept_invite`, and differs from
+the 409s in `dispositions.py` and `marketplace.py`, which refuse a *different*
+end state and so are real caller mistakes.
+
+`removed` is the data model doc's seventh status, added 2026-08-15. It needed no
+new checks anywhere: `CLAIMABLE_STATUSES`, `RESOLVABLE_STATUSES` and
+`SUGGESTION_ELIGIBLE_STATUSES` are allow-lists, so a removed item falls out of
+claiming, resolving and suggestion recompute by construction.
+
+`list_items_for_estate(estate_id, include_removed=False)` does the filtering, so
+the dashboard **and** the review table inherit it from one place. Filtering
+happens in Python rather than the query, so the `estate_id` equality filter stays
+covered by Firestore's automatic index — a second `where` would want a composite
+one.
+
+**firestore.rules deliberately does not allow `removed`** in its client-writable
+status list. That rule can only check membership, and removal is executor-only,
+so it has to go through this endpoint where `require_role` can see the role.
+
+### Cataloguing a belonging
+
+`POST /estates/{id}/items` is the entry point of the whole thing: one photograph
+in, one Item out. Executor only, the same gate as the append-photo endpoint —
+cataloguing is their job.
+
+**It adds no judgement of its own**, which is the point. The photo goes to Cloud
+Storage through `store_item_photo`, the bytes go to `classify_bytes`, and
+`create_item_from_classification` does everything else exactly as the seed
+script does: the 0.6 confidence threshold picks the status, the OverrideLog
+weights the suggestion, and an item landing in `needs_clarification` gets the
+agent's clarifying question posted to the family's feed. A photo uploaded here
+behaves identically to one classified from disk because it runs the same code.
+
+The item's document id is **reserved before the upload** (`reserve_item_id`), so
+the photograph is filed under the item it belongs to rather than needing a
+second key. Order of operations matters: an unusable file is rejected at 422
+before any Gemini call and before any document is written, so it leaves nothing
+behind.
+
+**`photo_urls` holds only the stored URL.** The seed and test paths also record
+the local file they read, which is why `photo_urls[0]` is not always displayable
+elsewhere; nothing created through this endpoint has that problem.
+
+A classification that *fails* does not fail the request — it comes back at
+confidence 0.0 and the item lands in `needs_clarification` with an honest note,
+which is what that status is for.
+
+`classify.py` gained `classify_bytes(data, mime_type)` as the single
+implementation; `classify_image(path)` now reads the file and calls it. No temp
+file, and no second copy of the prompt, schema, threshold or failure handling to
+drift apart.
 
 ### The invitation email
 

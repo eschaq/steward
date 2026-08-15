@@ -9,7 +9,7 @@ import { ESTATE_ID } from '../firebase'
 import {
   REVIEW_ORDER,
   RESOLUTION_LABEL,
-  isItemStatus,
+  isListedStatus,
   whereItGoes,
   type ItemStatus,
   type Me,
@@ -67,7 +67,7 @@ export function Review() {
     const buckets = new Map<ItemStatus, ReviewRow[]>()
     for (const status of REVIEW_ORDER) buckets.set(status, [])
     for (const row of rows ?? []) {
-      if (isItemStatus(row.status)) buckets.get(row.status)?.push(row)
+      if (isListedStatus(row.status)) buckets.get(row.status)?.push(row)
     }
     return [...buckets.entries()].filter(([, group]) => group.length > 0)
   }, [rows])

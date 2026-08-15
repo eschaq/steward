@@ -44,7 +44,16 @@ from dispositions import (
     record_disposition_decision,
 )
 from marketplace import MarketplaceError, get_listing, listing_id, recommend_channel
-from items import add_photo_url, get_item, list_items_for_estate
+from classify import classify_bytes
+from items import (
+    ItemError,
+    add_photo_url,
+    create_item_from_classification,
+    get_item,
+    list_items_for_estate,
+    remove_item,
+    reserve_item_id,
+)
 from messages import (
     AGENT_USER_ID,
     display_names_for,
@@ -851,6 +860,10 @@ def get_estate_members(estate_id: str, uid: CallerUid) -> MemberListResponse:
 def get_estate_review(estate_id: str, uid: CallerUid) -> ReviewResponse:
     """Every item with its claim count and its decision, in one request.
 
+    Removed items are absent here for the same reason they are absent from the
+    dashboard — `list_items_for_estate` leaves them out, so this inherits the
+    filter rather than repeating it.
+
     The review table needs four things per item and the client would otherwise
     ask for them one item at a time — 38 items became 114 round trips. Reads are
     batched here instead: claims by chunked `in` query, resolutions and
@@ -1142,6 +1155,65 @@ async def post_item_photo(
     return _summary(add_photo_url(item_id, url))
 
 
+@app.post("/estates/{estate_id}/items", response_model=ItemSummary, status_code=201)
+async def post_estate_item(
+    estate_id: str, uid: CallerUid, file: UploadFile = File(...)
+) -> ItemSummary:
+    """Catalogue a new belonging from a photograph. Executor only.
+
+    The entry point of the whole thing: one photograph in, one Item out. Same
+    executor gate as the append-photo endpoint, for the same reason —
+    cataloguing is the executor's job.
+
+    Nothing here decides anything. The photo goes to Cloud Storage through
+    `store_item_photo`, the bytes go to `classify_bytes`, and
+    `create_item_from_classification` does the rest exactly as it does for the
+    seed script: the confidence threshold picks the status, the OverrideLog
+    weights the suggestion, and an item that lands in `needs_clarification` gets
+    the agent's clarifying question posted to the family's feed. This function
+    adds no judgement of its own, which is why a photo uploaded here behaves
+    identically to one classified from disk.
+
+    A classification that fails does **not** fail the request: it comes back as
+    confidence 0.0 and the item lands in `needs_clarification` with an honest
+    note, which is the whole point of that status.
+    """
+    try:
+        require_role(uid, estate_id, MembershipRole.EXECUTOR)
+    except MembershipError as exc:
+        raise _forbidden(exc) from exc
+
+    data = await file.read()
+    if len(data) > MAX_BYTES:
+        # 413 rather than 409: this is about the request, not any item's state.
+        raise HTTPException(
+            status_code=413,
+            detail=f"That photo is larger than {MAX_BYTES // 1024 // 1024}MB.",
+        )
+
+    # The id is reserved first so the photograph can be filed under the item it
+    # belongs to, before that item exists.
+    item_id = reserve_item_id()
+    try:
+        url = store_item_photo(item_id, data, file.content_type)
+    except PhotoError as exc:
+        # Rejected before any Gemini call and before any document is written —
+        # an unusable file leaves nothing behind.
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    classification = classify_bytes(data, file.content_type or "image/png")
+    item = create_item_from_classification(
+        estate_id=estate_id,
+        classification=classification,
+        # Only the stored URL. The seed and test paths also record the local
+        # file they read, which is why photo_urls[0] is not always displayable
+        # elsewhere; nothing created here has that problem.
+        photo_urls=[url],
+        item_id=item_id,
+    )
+    return _summary(item)
+
+
 @app.post("/items/{item_id}/resolve", response_model=ResolutionResponse)
 def post_resolve(item_id: str, body: ResolveRequest, uid: CallerUid) -> ResolutionResponse:
     """Resolve a claimed or contested item. Executor only.
@@ -1201,6 +1273,32 @@ def post_disposition(
 
 
 # --- the agent --------------------------------------------------------------
+
+
+@app.post("/items/{item_id}/remove", response_model=ItemSummary)
+def post_remove_item(item_id: str, uid: CallerUid) -> ItemSummary:
+    """Take an item off the list. Executor only.
+
+    **POST, not DELETE.** DELETE would promise that the resource goes away, and
+    it does not: the document stays, its claims and messages stay attached, and
+    the item stays readable at this same URL. Naming the action honestly beats
+    borrowing a verb whose meaning is wrong here — and it matches the other
+    action endpoints (`/claim`, `/resolve`, `/disposition`).
+
+    **Idempotent.** Removing something already removed asks for a state it is
+    already in, so there is nothing to refuse; the second call returns the same
+    item and writes nothing.
+    """
+    item = _load_item(item_id)
+    try:
+        require_role(uid, item.estate_id, MembershipRole.EXECUTOR)
+    except MembershipError as exc:
+        raise _forbidden(exc) from exc
+
+    try:
+        return _summary(remove_item(item_id))
+    except ItemError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.post("/items/{item_id}/agent-message", response_model=AgentMessageResponse)

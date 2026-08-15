@@ -1,6 +1,13 @@
 /** Shapes the backend returns. Mirrors backend/api.py's response models, which
  * in turn mirror docs/estate-agent-data-model.md. */
 
+/** The statuses an item can be *listed* under — dashboard filters, ledger
+ * counts, review-table groups.
+ *
+ * `removed` is deliberately not here. The API never returns a removed item in
+ * any list, so a filter for it would be a chip that is always zero. It is still
+ * a real status with a real label — see ALL_ITEM_STATUSES — because the item is
+ * still reachable at its own URL and has to say what it is when you get there. */
 export const ITEM_STATUSES = [
   'unclaimed',
   'claimed',
@@ -10,7 +17,11 @@ export const ITEM_STATUSES = [
   'needs_clarification',
 ] as const
 
+/** Every status the backend can send, including the one that is never listed. */
+export const ALL_ITEM_STATUSES = [...ITEM_STATUSES, 'removed'] as const
+
 export type ItemStatus = (typeof ITEM_STATUSES)[number]
+export type AnyItemStatus = (typeof ALL_ITEM_STATUSES)[number]
 
 export interface Item {
   id: string
@@ -105,7 +116,7 @@ export interface ItemListResponse {
  * model. A family reading their own inventory gets "unspoken for" and "needs a
  * talk" — see the Voice section of docs/estate-agent-branding.md.
  */
-export const STATUS_LABEL: Record<ItemStatus, string> = {
+export const STATUS_LABEL: Record<AnyItemStatus, string> = {
   unclaimed: 'Unspoken for',
   claimed: 'Spoken for',
   contested: 'Needs a talk',
@@ -115,15 +126,18 @@ export const STATUS_LABEL: Record<ItemStatus, string> = {
   // nothing marks it complete yet.
   routed: 'On its way',
   needs_clarification: 'Needs a look',
+  // Off the list, not gone. Past tense because it already happened.
+  removed: 'Taken off the list',
 }
 
-export const STATUS_MEANING: Record<ItemStatus, string> = {
+export const STATUS_MEANING: Record<AnyItemStatus, string> = {
   unclaimed: 'Nobody has asked for this one yet.',
   claimed: 'One person has asked for this.',
   contested: 'More than one person has asked for this.',
   resolved: 'The executor has settled who it goes to.',
   routed: 'On its way — donated, sold, or discarded.',
   needs_clarification: "Steward couldn't place this one and has asked about it.",
+  removed: "The executor took this one off the list. Nothing about it was thrown away.",
 }
 
 /** The first photograph a browser can actually load.
@@ -137,7 +151,13 @@ export function firstPhoto(urls: string[] | undefined): string | undefined {
   return urls?.find((url) => /^https?:/i.test(url))
 }
 
-export function isItemStatus(value: string): value is ItemStatus {
+/** Any status the backend can send, `removed` included — this is the check a
+ * chip or a label should use. Filters and groups iterate ITEM_STATUSES instead. */
+export function isItemStatus(value: string): value is AnyItemStatus {
+  return (ALL_ITEM_STATUSES as readonly string[]).includes(value)
+}
+
+export function isListedStatus(value: string): value is ItemStatus {
   return (ITEM_STATUSES as readonly string[]).includes(value)
 }
 

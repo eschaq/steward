@@ -75,6 +75,15 @@ export function StatusMark({ status }: { status: string }) {
           <path d="M6 9.7v.1" />
         </svg>
       )
+    // Taken off the list — a line drawn through it, the way you'd score a line
+    // out of a ledger without tearing the page.
+    case 'removed':
+      return (
+        <svg {...common}>
+          <circle cx="6" cy="6" r="4" />
+          <path d="M3.2 8.8 8.8 3.2" />
+        </svg>
+      )
     // An unrecognised status still gets a mark, so the row doesn't jump.
     default:
       return (

@@ -74,6 +74,25 @@ NO_CREDENTIALS = (
     "You'll need to pass the word along yourself."
 )
 
+# RFC 2606 / RFC 6761 reserve these so they can never receive mail. The test
+# scripts drive the real endpoint through TestClient, so without this guard every
+# suite run submits an invite to a domain with no mail exchanger — Gmail accepts
+# it, fails to deliver, and bounces a delivery-failure notice into the sending
+# account's inbox. Skipping is both correct and quieter: there is no address here
+# to reach.
+UNDELIVERABLE_DOMAINS = (
+    "example.com", "example.net", "example.org",
+    ".test", ".invalid", ".example", ".localhost",
+)
+
+
+def is_undeliverable(email: str) -> bool:
+    """True for reserved domains that by definition cannot receive mail."""
+    domain = email.strip().rsplit("@", 1)[-1].lower()
+    return domain in UNDELIVERABLE_DOMAINS or domain.endswith(
+        tuple(d for d in UNDELIVERABLE_DOMAINS if d.startswith("."))
+    )
+
 
 def credentials() -> tuple[Optional[str], Optional[str]]:
     """The Gmail address and app password, or (None, None) if not configured."""
@@ -181,6 +200,16 @@ def send_invite_email(
     Returns a SendResult either way. A caller that treats this as best-effort is
     correct: the membership already exists by the time this runs.
     """
+    if is_undeliverable(to_email):
+        logger.info(
+            "invite email skipped for %s: reserved domain, cannot receive mail", to_email
+        )
+        return SendResult(
+            False,
+            f"No email went to {to_email} — that's a reserved test domain that "
+            "can't receive mail.",
+        )
+
     address, password = credentials()
     if address is None or password is None:
         logger.warning("invite email skipped for %s: GMAIL_ADDRESS/GMAIL_APP_PASSWORD not set", to_email)

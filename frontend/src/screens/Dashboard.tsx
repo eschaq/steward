@@ -1,12 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
-import { ApiError, fetchEstateItems } from '../api'
+import { ApiError, fetchEstateItems, fetchMe } from '../api'
 import { useAuth } from '../auth'
 import { ESTATE_ID } from '../firebase'
+import { AddItem } from '../components/AddItem'
 import { ItemCard } from '../components/ItemCard'
 import { StatusFilters, type Filter } from '../components/StatusFilters'
 import { EstateNav } from '../components/EstateNav'
-import { ITEM_STATUSES, STATUS_LABEL, type Item, type ItemStatus } from '../types'
+import {
+  ITEM_STATUSES,
+  STATUS_LABEL,
+  type Item,
+  type ItemStatus,
+  type Me,
+} from '../types'
 
 function emptyCounts(): Record<ItemStatus, number> {
   return Object.fromEntries(ITEM_STATUSES.map((s) => [s, 0])) as Record<ItemStatus, number>
@@ -18,15 +26,21 @@ function plural(count: number, one: string, many: string): string {
 
 export function Dashboard() {
   const { user, leave } = useAuth()
+  const navigate = useNavigate()
   const [items, setItems] = useState<Item[] | null>(null)
+  const [me, setMe] = useState<Me | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
 
   const load = useCallback(async () => {
     setProblem(null)
     try {
-      const body = await fetchEstateItems(ESTATE_ID)
+      const [body, standing] = await Promise.all([
+        fetchEstateItems(ESTATE_ID),
+        fetchMe(ESTATE_ID),
+      ])
       setItems(body.items)
+      setMe(standing)
     } catch (error) {
       // Say what went wrong rather than showing an empty grid that looks like
       // an estate with nothing in it.
@@ -53,6 +67,13 @@ export function Dashboard() {
     () => (filter === 'all' ? (items ?? []) : (items ?? []).filter((i) => i.status === filter)),
     [items, filter],
   )
+
+  // Straight to the new item rather than back to a grid of thirty-nine cards
+  // to hunt through. What Steward made of the photograph is the thing the
+  // executor just asked a question about, so it should be the thing they see.
+  function added(item: Item) {
+    navigate(`/items/${item.id}`)
+  }
 
   const total = items?.length ?? 0
   // A ledger, not a score: how many things are where, with no target to hit.
@@ -97,6 +118,8 @@ export function Dashboard() {
           </div>
         )}
       </header>
+
+      {items !== null && me?.role === 'executor' && <AddItem onAdded={added} />}
 
       {items !== null && (
         <div className="ledger">

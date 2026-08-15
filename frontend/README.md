@@ -20,7 +20,7 @@ backend and real Firebase Auth — there is no mock data anywhere in here.
 | `src/screens/ResolveItem.tsx` | The executor's decision screen                    |
 | `src/screens/Review.tsx`      | The executor's bulk review table                  |
 | `src/screens/Family.tsx`      | Who else is here, and the invite form              |
-| `src/components/`             | `ItemCard`, `StatusChip`, `StatusFilters`, `StewardMark`, `Claimants`, `MessageThread`, `Disposition` |
+| `src/components/`             | `AddItem`, `ItemCard`, `StatusChip`, `StatusMark`, `StatusFilters`, `StewardMark`, `Claimants`, `MessageThread`, `Disposition` |
 | `public/brand/`               | Hero photography (greyscale; duotoned in CSS)       |
 | `mockups/`                    | Design comps — not built, not served                |
 | `verify.mjs`                  | Drives the real app in a real browser (Playwright)  |
@@ -579,6 +579,50 @@ element headers rather than sixteen banner landmarks — correct as written.
 - **The review table's thumbnail keeps `alt=""`** — the item's name is the very
   next thing in the cell, and describing it would make a screen reader say it
   twice.
+
+## Taking one off the list
+
+A quiet underlined "Take this off the list" at the **bottom** of the item page,
+executor-only — an action nobody came here to take shouldn't sit above the thing
+they did come for, or look like an invitation.
+
+Clicking it swaps in a plain question, not a modal: *"Take this off the list? You
+can still find it if you need to — nothing gets thrown away."* with **Yes, take
+it off** and **Leave it**. Sage, not red: removing a duplicate photograph is
+housekeeping, not a danger, and the brand has no alarm states.
+
+Afterwards the page keeps working and says so — *"This one is off the list.
+Everything said about it is still here… it just won't show up in the inventory or
+the review table."* The status chip reads **Taken off the list**, with a ringed
+strike-through mark.
+
+`removed` is a real status with a real label but is **not** in `ITEM_STATUSES`,
+which drives the dashboard filters, the ledger counts and the review groups — the
+API never returns a removed item in a list, so a filter for it would be a chip
+that is permanently zero. `ALL_ITEM_STATUSES` is the wider set that labels and
+chips use; `isListedStatus()` is the narrower check for grouping.
+
+## Adding a belonging
+
+**"Add an item" on the dashboard, executor-only.** A file picker, then a real
+wait, then the new item's own page.
+
+- **The wait is named, in two parts.** "Sending the photo…" for the first beat,
+  then "Steward is looking at it…" once the Gemini call is where the time is
+  actually going. A spinner could mean anything; this says what is happening.
+  Underneath: *"This takes a few seconds… No need to wait on it if you'd rather
+  carry on."*
+- **It lands on the new item, not back on the grid.** What Steward made of the
+  photograph is the thing the executor just asked a question about, so it should
+  be the thing they see — not a hunt through thirty-nine cards.
+- **The file input is visually hidden but still focusable and labelled.**
+  `display: none` would take it out of the tab order; the clip-rect pattern
+  keeps it reachable, and the button next to it opens it.
+- **The input resets on change.** Without that, picking the same file twice in a
+  row fires no change event and the second upload silently never happens.
+
+One photo, one item, one call. Uploading six things means six calls — a batch
+endpoint is a different feature with different questions behind it.
 
 ## Photographs
 

@@ -2282,3 +2282,114 @@ h3 {
   height: 11px;
   opacity: 0.85;
 }
+
+/* --- adding a belonging --------------------------------------------------- */
+
+.add-item {
+  margin-top: 26px;
+}
+
+/* The real input is hidden but still focusable and still labelled — the button
+   next to it opens it. `display: none` would take it out of the tab order. */
+.add-item__file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.add-item__note {
+  margin: 10px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--on-surface-variant);
+  max-width: 56ch;
+}
+
+.add-item__problem {
+  margin: 10px 0 0;
+  padding: 12px 15px;
+  background: var(--error-container);
+  border-radius: var(--r-row);
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--on-error-container);
+  max-width: 60ch;
+}
+
+/* --- taking something off the list ---------------------------------------- */
+
+.remove {
+  margin-top: 34px;
+  padding-top: 20px;
+  border-top: 1px solid var(--hairline);
+}
+
+/* Quiet by default: an action nobody came here to take shouldn't look like an
+   invitation. It is not red — removing a duplicate photo is housekeeping, not
+   a danger. */
+.remove__start {
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--outline);
+  background: none;
+  border: none;
+  padding: 6px 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.remove__start:hover {
+  color: var(--on-surface-variant);
+}
+
+.remove__ask {
+  background: var(--surface-low);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-row);
+  padding: 18px 20px 20px;
+}
+
+.remove__question {
+  margin: 0 0 14px;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--on-surface);
+  max-width: 54ch;
+}
+
+.remove__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Sized to match --sage, because these two sit side by side and "leave it"
+   should not read as the lesser option of the pair. */
+.button--quiet {
+  height: 44px;
+  padding: 0 20px;
+  font-size: 14px;
+  background: transparent;
+  color: var(--on-surface-variant);
+  border: 1px solid var(--outline-variant);
+}
+
+.button--quiet:hover:not(:disabled) {
+  background: var(--surface-mid);
+}
+
+.remove__done {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--on-surface-variant);
+  max-width: 62ch;
+}

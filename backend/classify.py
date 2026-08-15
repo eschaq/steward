@@ -175,27 +175,26 @@ def _parse_json_object(raw: str) -> Optional[dict]:
     return payload if isinstance(payload, dict) else None
 
 
-def classify_image(
-    image_path: str | Path, model_override: Optional[str] = None
+def classify_bytes(
+    data: bytes, mime_type: str, model_override: Optional[str] = None
 ) -> Classification:
-    """Classify the household item in `image_path`.
+    """Classify the household item in an image already in memory.
+
+    The one implementation. `classify_image` reads a file and calls this, so a
+    photo arriving over HTTP takes exactly the same path as one on disk — same
+    prompt, same schema, same confidence threshold, same failure handling. No
+    temp file, and no second copy of this logic to drift.
 
     Always returns a Classification. Transport, quota, and parse failures come
     back as confidence 0.0 with `error` set, so the caller's status logic routes
     them to needs_clarification rather than the upload failing.
     """
-    path = Path(image_path)
-    if not path.is_file():
-        raise FileNotFoundError(f"No image at {path}")
-
-    mime_type = mimetypes.guess_type(path.name)[0] or "image/png"
-
     try:
         response = vertex_client().models.generate_content(
             model=model_name(model_override),
             contents=[
                 PROMPT,
-                types.Part.from_bytes(data=path.read_bytes(), mime_type=mime_type),
+                types.Part.from_bytes(data=data, mime_type=mime_type or "image/png"),
             ],
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
@@ -220,6 +219,17 @@ def classify_image(
         )
     except ValidationError as exc:
         return _unreadable(f"response failed validation: {exc.errors()[0]['msg']}")
+
+
+def classify_image(
+    image_path: str | Path, model_override: Optional[str] = None
+) -> Classification:
+    """Classify the household item in `image_path`. Thin wrapper on classify_bytes."""
+    path = Path(image_path)
+    if not path.is_file():
+        raise FileNotFoundError(f"No image at {path}")
+    mime_type = mimetypes.guess_type(path.name)[0] or "image/png"
+    return classify_bytes(path.read_bytes(), mime_type, model_override)
 
 
 def status_for_confidence(confidence: float) -> ItemStatus:

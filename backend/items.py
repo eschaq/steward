@@ -79,8 +79,14 @@ def add_photo_url(item_id: str, url: str) -> Item:
     return Item.model_validate(doc_ref.get().to_dict())
 
 
-def list_items_for_estate(estate_id: str) -> list[Item]:
+def list_items_for_estate(estate_id: str, include_removed: bool = False) -> list[Item]:
     """Every item in an estate, newest first — what the dashboard renders.
+
+    Removed items are left out by default: an item taken off the list should be
+    off the list everywhere that lists things. It is still readable at its own
+    URL, which is the difference between removed and deleted. Filtering happens
+    here rather than in the query so the estate_id equality filter stays covered
+    by Firestore's automatic index — a second `where` would want a composite one.
 
     Single-field equality filter, so Firestore's automatic index covers it.
     Ordering is done here rather than in the query for the same reason: an
@@ -93,7 +99,36 @@ def list_items_for_estate(estate_id: str) -> list[Item]:
         .get()
     )
     items = [Item.model_validate(s.to_dict()) for s in snapshots]
+    if not include_removed:
+        items = [item for item in items if item.status is not ItemStatus.REMOVED]
     return sorted(items, key=lambda i: i.created_at, reverse=True)
+
+
+def remove_item(item_id: str) -> Item:
+    """Take an item off the list without deleting anything.
+
+    A soft delete: the document stays, its claims, messages and resolution stay
+    attached, and the item stays readable at its own URL. Only `status` moves.
+    Deleting the document would orphan everything pointing at it and leave the
+    family with a gap they cannot ask about — visible state beats silent
+    erasure.
+
+    **Idempotent**, deliberately. Removing something already removed asks for a
+    state it is already in, so there is nothing to refuse; a second call returns
+    the same item and writes nothing. That matches accept_invite, and differs
+    from the errors dispositions.py and marketplace.py raise — those refuse a
+    *different* end state, which is a real caller mistake worth surfacing.
+    """
+    item = get_item(item_id)
+    if item is None:
+        raise ItemError(f"No item {item_id} to remove.")
+    if item.status is ItemStatus.REMOVED:
+        return item
+
+    get_db().collection(Item.COLLECTION).document(item_id).update(
+        {"status": ItemStatus.REMOVED.value}
+    )
+    return item.model_copy(update={"status": ItemStatus.REMOVED})
 
 
 def recompute_suggestion(item_id: str) -> DispositionSuggestion:
@@ -147,6 +182,17 @@ def recompute_suggestion(item_id: str) -> DispositionSuggestion:
         doc_ref.update({"suggested_disposition": suggestion.suggested_disposition.value})
 
     return suggestion
+
+
+def reserve_item_id() -> str:
+    """A Firestore document id for an item that does not exist yet.
+
+    Needed because a photograph is filed under its item's id, and the photo has
+    to be in Cloud Storage before there is an Item to point at it. Reserving the
+    id first keeps the storage path meaningful rather than inventing a second
+    key for it.
+    """
+    return get_db().collection(Item.COLLECTION).document().id
 
 
 def create_item_from_classification(

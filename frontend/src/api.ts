@@ -203,6 +203,29 @@ export async function fetchReview(estateId: string): Promise<ReviewResponse> {
 }
 
 /** Attach a photograph to an item. Executor only, enforced server-side. */
+/** Catalogue a new belonging from a photograph.
+ *
+ * Slow on purpose: a real Gemini call sits inside it. The caller has to say so
+ * rather than leave the executor watching nothing happen. */
+export async function addEstateItem(estateId: string, file: File): Promise<Item> {
+  const form = new FormData()
+  form.append('file', file)
+  const response = await authorizedFetch(
+    `/estates/${encodeURIComponent(estateId)}/items`,
+    { method: 'POST', form },
+  )
+  return (await response.json()) as Item
+}
+
+/** Take an item off the list. Executor only, and idempotent — the document and
+ * everything attached to it stay exactly where they are. */
+export async function removeItem(itemId: string): Promise<Item> {
+  const response = await authorizedFetch(`/items/${encodeURIComponent(itemId)}/remove`, {
+    method: 'POST',
+  })
+  return (await response.json()) as Item
+}
+
 export async function uploadItemPhoto(itemId: string, file: File): Promise<Item> {
   const form = new FormData()
   form.append('file', file)

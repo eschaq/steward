@@ -9,6 +9,7 @@ import {
   fetchItemMessages,
   fetchMe,
   decideDisposition,
+  removeItem,
   fetchItemDisposition,
   requestListing,
   uploadItemPhoto,
@@ -51,6 +52,8 @@ export function ItemDetail() {
   const [uploading, setUploading] = useState(false)
   const [disposition, setDisposition] = useState<DispositionDetail | null>(null)
   const [deciding, setDeciding] = useState<DispositionChoice | null>(null)
+  const [asking, setAsking] = useState(false)
+  const [removing, setRemoving] = useState(false)
   const [comment, setComment] = useState('')
 
   const load = useCallback(async () => {
@@ -134,6 +137,21 @@ export function ItemDetail() {
       )
     } finally {
       setDeciding(null)
+    }
+  }
+
+  async function onRemove() {
+    setProblem(null)
+    setRemoving(true)
+    try {
+      setItem(await removeItem(itemId))
+      setAsking(false)
+    } catch (error) {
+      setProblem(
+        error instanceof ApiError ? error.message : `Couldn't take that off: ${error}`,
+      )
+    } finally {
+      setRemoving(false)
     }
   }
 
@@ -294,6 +312,54 @@ export function ItemDetail() {
             <h2 className="eyebrow">About this one</h2>
             <MessageThread messages={messages ?? []} prominentId={mediationId} />
           </section>
+
+          {/* Last on the page on purpose. Taking something off the list is not
+              what anyone came here to do, so it doesn't sit above the thing
+              they did come for. */}
+          {me?.role === 'executor' && (
+            <section className="remove">
+              {item.status === 'removed' ? (
+                <p className="remove__done">
+                  This one is off the list. Everything said about it is still
+                  here, and this page will keep working — it just won't show up
+                  in the inventory or the review table.
+                </p>
+              ) : asking ? (
+                <div className="remove__ask">
+                  <p className="remove__question">
+                    Take this off the list? You can still find it if you need to
+                    — nothing gets thrown away.
+                  </p>
+                  <div className="remove__actions">
+                    <button
+                      className="button button--sage"
+                      type="button"
+                      onClick={() => void onRemove()}
+                      disabled={removing}
+                    >
+                      {removing ? 'Taking it off…' : 'Yes, take it off'}
+                    </button>
+                    <button
+                      className="button button--quiet"
+                      type="button"
+                      onClick={() => setAsking(false)}
+                      disabled={removing}
+                    >
+                      Leave it
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  className="remove__start"
+                  type="button"
+                  onClick={() => setAsking(true)}
+                >
+                  Take this off the list
+                </button>
+              )}
+            </section>
+          )}
         </>
       )}
     </main>

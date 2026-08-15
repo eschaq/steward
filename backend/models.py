@@ -45,6 +45,15 @@ class ItemStatus(str, Enum):
     RESOLVED = "resolved"
     ROUTED = "routed"
     NEEDS_CLARIFICATION = "needs_clarification"
+    # Added after the data model doc's original six — see the note there.
+    # A mis-photographed or duplicate item taken off the list without deleting
+    # the document, so any claims, messages or resolution already attached stay
+    # attached instead of being orphaned. Every status gate in this codebase is
+    # an allow-list (CLAIMABLE_STATUSES, RESOLVABLE_STATUSES,
+    # SUGGESTION_ELIGIBLE_STATUSES), so a removed item is excluded from claiming,
+    # resolving and suggestion recompute by construction rather than by a new
+    # check in each place.
+    REMOVED = "removed"
 
 
 class Estate(BaseModel):
