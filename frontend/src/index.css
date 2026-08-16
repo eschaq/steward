@@ -1614,9 +1614,27 @@ h3 {
 
 /* Narrow screens: the table becomes stacked cards rather than scrolling
  * sideways. An executor on a phone should still be able to read a row. */
+/* Below 820px the table becomes one card per item — measured, not guessed: the
+ * four columns collapse to zero width at 820 and the row goes from 80px tall to
+ * 233px, so the table has already stopped being a table by then.
+ *
+ * Cards rather than a horizontally scrolling table, because this is the screen
+ * an executor *works through* — swiping left and right inside a row to decide
+ * something is the opposite of unhurried. Cards rather than hiding columns,
+ * because the ones that would go (who asked, what was decided) are exactly the
+ * ones the decision needs. Nothing is dropped; it reads downward instead. */
 @media (max-width: 820px) {
+  /* Was `display: none`, which took the column headings away and left every
+     value unlabelled — "Given away" with nothing saying which column it was.
+     Hidden visually instead, so the table keeps its semantics for a screen
+     reader while the labels reappear on each cell below. */
   .review thead {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
   .review,
   .review tbody,
@@ -1639,6 +1657,27 @@ h3 {
   .review__action {
     text-align: left;
     padding-bottom: 18px;
+  }
+
+  /* The column heading, carried down onto the cell it belongs to. */
+  .review td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin: 10px 0 3px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--outline);
+  }
+  .review td:empty {
+    display: none;
+  }
+  .review__confidence {
+    display: block;
+  }
+  .review__quiet {
+    white-space: normal;
   }
 }
 
@@ -2491,3 +2530,52 @@ h3 {
   opacity: 0.9;
   max-width: 54ch;
 }
+
+/* ===========================================================================
+   Responsive pass, 2026-08-16. Audited at 375 / 768 / 1280 with real device
+   emulation. Everything here is a behaviour fix inside the existing tokens —
+   no new colours, no new type sizes, nothing redesigned.
+   =========================================================================== */
+
+/* --- the app bar wraps instead of being swallowed -------------------------
+   `.hero` is `overflow: hidden` (it clips the gable photograph), so the nav
+   overflowing simply *vanished*: at 375px the fourth link, Family, was cut off
+   the right edge and unreachable. Wrapping rather than side-scrolling, because
+   a strip you have to swipe hides where you can go — and knowing where you can
+   go is the one thing an app bar is for. */
+.estate-nav {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+@media (max-width: 560px) {
+  .estate-nav {
+    gap: 14px;
+    row-gap: 6px;
+  }
+  .estate-nav__link {
+    font-size: 16px;
+  }
+}
+
+/* --- tap targets ----------------------------------------------------------
+   WCAG 2.5.8 (AA) wants 24×24 minimum. These four were 15–21px: small enough
+   to miss with a thumb, and all of them are the only way to somewhere. */
+.estate-nav__mark,
+.hero__crumb,
+.hero__back,
+.msg__about,
+.review__link {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* The whole cell is the reach on a touch screen, not the words. */
+@media (max-width: 820px) {
+  .review__link,
+  .msg__about {
+    min-height: 32px;
+  }
+}
+

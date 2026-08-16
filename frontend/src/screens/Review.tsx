@@ -196,7 +196,7 @@ export function Review() {
                         </span>
                       </th>
 
-                      <td>
+                      <td data-label="Asked for by">
                         {row.claimant_count === 0 ? (
                           <span className="review__quiet">Nobody yet</span>
                         ) : row.sole_claimant_name ? (
@@ -206,7 +206,7 @@ export function Review() {
                         )}
                       </td>
 
-                      <td>
+                      <td data-label="Suggested">
                         {row.suggested_disposition === 'uncertain' ? (
                           <span className="review__quiet">No suggestion yet</span>
                         ) : (
@@ -217,7 +217,10 @@ export function Review() {
                         </span>
                       </td>
 
-                      <td className="review__action">
+                      <td
+                        className="review__action"
+                        data-label={showsDestination ? 'Decided' : undefined}
+                      >
                         {row.decided_type && (
                           <span className="review__decided">
                             {RESOLUTION_LABEL[row.decided_type as ResolutionType] ??
@@ -255,7 +258,7 @@ export function Review() {
                       </td>
 
                       {showsDestination && (
-                        <td>
+                        <td data-label="Where it goes">
                           {row.disposition ? (
                             <span className="review__destination">
                               {whereItGoes(row.disposition)}

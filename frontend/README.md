@@ -515,6 +515,60 @@ The sign-in screen keeps **"Forgot your password?"** — *"Just been invited? Pu
 your email above and use that link — it's how you set a password the first
 time."* That is the way in if the email never arrives or the link goes stale.
 
+## Responsive behaviour
+
+Audited 2026-08-16 at **375 / 768 / 1280** with real device emulation
+(`isMobile`, `hasTouch`), measuring overflow and tap-target geometry rather
+than reading the CSS and assuming. Findings per screen:
+
+| Screen | Found | Fixed |
+| --- | --- | --- |
+| Sign in | nothing | — |
+| Dashboard | **nav clipped at 375** | nav wraps |
+| Item detail | nav clipped at 375 | nav wraps; the two-column placard already collapsed at 820 |
+| Message Center | nav clipped at 375; `msg__about` 17px tall | nav wraps; target ≥24 |
+| Review table | **every cell unlabelled below 820** | column headings carried onto each cell |
+| Family | nav clipped at 375 | nav wraps |
+
+**The nav was the real breakage.** `.hero` is `overflow: hidden` — it clips the
+gable photograph — so when the four links exceeded 375px the fourth one,
+**Family, was cut off the right edge and unreachable**. Not cramped: gone. The
+nav now wraps to a second line. Wrapping rather than a side-scrolling strip,
+because a strip you have to swipe hides where you can go, and knowing where you
+can go is the one thing an app bar is for.
+
+**The review table was already stacking at 820px** — but with
+`thead { display: none }`, which removed the column headings and left every
+value unlabelled. "Given away" with nothing saying which column it was; "2
+people" and "90% sure" survived only because they happen to describe
+themselves. The heading is now visually hidden rather than removed (keeping
+table semantics for a screen reader) and each cell carries its own label
+through `data-label` + `::before`.
+
+The 820px boundary is measured, not chosen: at 860px the four columns are
+283/134/183/210 and a row is 80px tall; at 820px they collapse to nothing and
+the row becomes 292px. The table has already stopped being a table by then.
+
+**Cards, not horizontal scroll or column-hiding.** This is the screen an
+executor *works through*; swiping left and right inside a row to decide
+something is the opposite of unhurried. And the columns that would be hidden —
+who asked, what was decided — are exactly the ones the decision needs. Nothing
+is dropped; it reads downward instead.
+
+The `Decided` label is conditional in the same way the desktop header is: on a
+contested group the last cell holds a *Talk it through* button, and captioning a
+button as a decision would be a lie.
+
+**Tap targets.** Four inline links measured 15–21px against WCAG 2.5.8's 24×24
+minimum — `review__link`, `msg__about`, `hero__crumb`, `estate-nav__mark` — all
+of them the only route to somewhere. Each now has `min-height: 24px`, rising to
+32 below 820 where the whole cell is the reach. Two `input`s still measure small
+and are deliberately fine: the file input is visually hidden with its button as
+the target, and the role radio sits inside a 273×118 label.
+
+Verified after the fixes: **no horizontal overflow on any screen at any
+breakpoint**, and every real target ≥24px.
+
 ## Accessibility — WCAG 2.1 AA
 
 Ratios computed from the actual token values (WCAG relative-luminance formula,
