@@ -26,6 +26,7 @@ authentication, which is what Cloud Run serves.
 | `marketplace.py`     | **Tier 2** — which marketplace to sell on, and why                |
 | `mailer.py`          | The invitation email, over Gmail SMTP. Best-effort, never a gate  |
 | `clarify.py`         | Answering the agent's question, and re-reading the item with it   |
+| `notify.py`          | The two emails a family gets without opening the app              |
 | `init_firestore.py`  | Seeds one document per collection and reads it back             |
 | `seed_demo_items.py` | Demo inventory for the dashboard — **not** a test fixture       |
 | `test_membership.py` | Script: invite + accept two users, print each role              |
@@ -372,6 +373,48 @@ which is what that status is for.
 implementation; `classify_image(path)` now reads the file and calls it. No temp
 file, and no second copy of the prompt, schema, threshold or failure handling to
 drift apart.
+
+### Telling people something happened
+
+Steward is multi-user, and until now nothing reached out except the invitation.
+The question a family actually asks is *"how would my sister know this
+happened?"* — and there were exactly two moments where the honest answer was
+"she wouldn't":
+
+**1. An item became contested.** Every claimant is emailed the moment the
+mediation posts. **The mediation message is the body** — it was written for
+exactly this moment in exactly this voice, and wrapping it in "You have a new
+notification" would replace something a person can act on with an envelope.
+
+**2. A resolution was recorded.** Every claimant hears what was decided and by
+what method — **including whoever didn't get it**. That is the harder message
+and the more necessary one; a product that writes only to the winner is telling
+people they matter in proportion to whether they got what they wanted. The same
+words go to everyone: a softer version for whoever missed out would leave the
+family holding two different accounts of one decision.
+
+Both hang off the existing seams — `claims.recompute_item_status` on the
+transition into contested, and the tail of `resolutions.resolve_item` — and both
+run *after* the real work, wrapped in their own try/except. Verified: with
+`GMAIL_APP_PASSWORD` unset the item still goes contested and the mediation still
+posts, and the log says plainly that nothing was sent.
+
+`mailer.send()` is now the one place SMTP is spoken. `send_invite_email` was
+refactored onto it rather than the notification code growing a second copy of
+credentials, TLS, reserved-domain skipping and failure handling.
+
+`STEWARD_APP_URL`, when set, puts a link to the item in both emails; when it
+isn't, they simply omit it rather than printing a dead address at someone.
+
+**No preferences and no unsubscribe, and that is a real gap rather than an
+oversight** — see the note at the foot of `notify.py`. Both would need somewhere
+in the data model to live, a UI to set them, and an unauthenticated route to
+honour an unsubscribe link. A half-built version — an unsubscribe link that goes
+nowhere — would be worse than none, because it would promise something the
+system cannot do. Two triggers, both about a specific decision on a specific
+belonging, is a volume a family will not want to switch off; that stops being
+true the moment anything chattier is added, and the preference work has to land
+first.
 
 ### The invitation email
 

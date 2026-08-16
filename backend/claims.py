@@ -17,6 +17,7 @@ from google.cloud.firestore_v1.base_query import FieldFilter
 
 from firebase_app import get_db
 from messages import post_contested_mediation
+from notify import notify_contested
 from models import Claim, Item, ItemStatus
 
 # Statuses this module owns. An item that has been resolved or routed has moved
@@ -123,7 +124,21 @@ def recompute_item_status(item_id: str) -> ItemStatus:
     doc_ref.update({"status": new_status.value})
 
     if new_status is ItemStatus.CONTESTED:
-        post_contested_mediation(data["estate_id"], item_id, claimant_ids)
+        posted = post_contested_mediation(data["estate_id"], item_id, claimant_ids)
+        # Email the claimants with what the agent just said. Best-effort and
+        # after the fact: the status has moved and the message has posted, and
+        # neither should be undone by a mail server. `posted` is None when the
+        # agent had already said this, in which case there is nothing new to
+        # send either.
+        if posted is not None:
+            try:
+                notify_contested(
+                    Item.model_validate(doc_ref.get().to_dict()),
+                    claimant_ids,
+                    posted.text,
+                )
+            except Exception as exc:  # noqa: BLE001 — a courtesy, never a gate
+                print(f"  ! could not email the claimants about {item_id}: {exc}")
 
     return new_status
 

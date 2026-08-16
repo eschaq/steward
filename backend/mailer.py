@@ -1,4 +1,5 @@
-"""The invitation email, sent over Gmail SMTP.
+"""Outbound email over Gmail SMTP — invitations, and the two moments a family
+needs to hear about without opening the app.
 
 A courtesy on top of the membership record, never a gate in front of it. The
 EstateMembership row is the source of truth about who has been asked to an
@@ -188,6 +189,61 @@ def invite_html(
 """
 
 
+def send(
+    to_email: str,
+    subject: str,
+    text: str,
+    html: Optional[str] = None,
+    kind: str = "email",
+    failure_note: Optional[str] = None,
+) -> SendResult:
+    """Send one message. Never raises — the caller's work is already done.
+
+    The one place SMTP is spoken in this codebase. Every outbound email goes
+    through here so credentials, reserved-domain skipping, TLS and failure
+    handling exist once rather than once per notification.
+    """
+    if is_undeliverable(to_email):
+        logger.info("%s email skipped for %s: reserved domain", kind, to_email)
+        return SendResult(
+            False,
+            f"No email went to {to_email} — that's a reserved test domain that "
+            "can't receive mail.",
+        )
+
+    address, password = credentials()
+    if address is None or password is None:
+        logger.warning(
+            "%s email skipped for %s: GMAIL_ADDRESS/GMAIL_APP_PASSWORD not set",
+            kind, to_email,
+        )
+        return SendResult(False, NO_CREDENTIALS)
+
+    message = EmailMessage()
+    message["Subject"] = subject
+    message["From"] = formataddr((FROM_NAME, address))
+    message["To"] = to_email
+    message.set_content(text)
+    if html:
+        message.add_alternative(html, subtype="html")
+
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=SMTP_TIMEOUT) as smtp:
+            smtp.starttls(context=ssl.create_default_context())
+            smtp.login(address, password)
+            smtp.send_message(message)
+    except Exception as exc:  # noqa: BLE001 — every failure degrades the same way
+        # The address is logged, the credentials never are.
+        logger.exception("%s email to %s failed", kind, to_email)
+        return SendResult(
+            False,
+            failure_note or f"That email didn't go out ({type(exc).__name__}).",
+        )
+
+    logger.info("%s email sent to %s", kind, to_email)
+    return SendResult(True, f"An email is on its way to {to_email}.")
+
+
 def send_invite_email(
     to_email: str,
     link: str,
@@ -210,33 +266,16 @@ def send_invite_email(
             "can't receive mail.",
         )
 
-    address, password = credentials()
-    if address is None or password is None:
-        logger.warning("invite email skipped for %s: GMAIL_ADDRESS/GMAIL_APP_PASSWORD not set", to_email)
-        return SendResult(False, NO_CREDENTIALS)
-
-    message = EmailMessage()
-    message["Subject"] = f"You've been asked to {estate_name}"
-    message["From"] = formataddr((FROM_NAME, address))
-    message["To"] = to_email
-    message.set_content(invite_text(display_name, estate_name, inviter_name, link))
-    message.add_alternative(
-        invite_html(display_name, estate_name, inviter_name, link), subtype="html"
+    return send(
+        to_email,
+        subject=f"You've been asked to {estate_name}",
+        text=invite_text(display_name, estate_name, inviter_name, link),
+        html=invite_html(display_name, estate_name, inviter_name, link),
+        kind="invite",
+        failure_note=(
+            "The invite is recorded, but the email didn't go out. "
+            "Worth telling them yourself."
+        ),
     )
 
-    try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=SMTP_TIMEOUT) as smtp:
-            smtp.starttls(context=ssl.create_default_context())
-            smtp.login(address, password)
-            smtp.send_message(message)
-    except Exception as exc:  # noqa: BLE001 — every failure degrades the same way
-        # The address is logged, the credentials never are.
-        logger.exception("invite email to %s failed", to_email)
-        return SendResult(
-            False,
-            f"The invite is recorded, but the email didn't go out ({type(exc).__name__}). "
-            "Worth telling them yourself.",
-        )
 
-    logger.info("invite email sent to %s", to_email)
-    return SendResult(True, f"An email is on its way to {to_email}.")

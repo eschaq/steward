@@ -20,6 +20,8 @@ from typing import Optional
 from claims import get_claims_for_item
 from firebase_app import get_db
 from membership import MembershipRole, require_role
+from messages import display_names_for
+from notify import notify_resolved
 from models import Item, ItemStatus, Resolution, ResolutionType
 
 # An item can only be resolved out of the claim triad's two decided states.
@@ -136,5 +138,25 @@ def resolve_item(
         _to_firestore(resolution)
     )
     item_ref.update({"status": ItemStatus.RESOLVED.value})
+
+    # Everyone who asked hears what was decided — including whoever didn't get
+    # it. Best-effort and last: the resolution is recorded above and stands
+    # whatever happens here.
+    try:
+        names = display_names_for(
+            [resolved_by_user_id] + ([resolved_to_user_id] if resolved_to_user_id else [])
+        )
+        notify_resolved(
+            item=Item.model_validate(item_ref.get().to_dict()),
+            claimant_ids=sorted(claimant_ids),
+            resolution_type=resolution_type.value,
+            resolved_by_name=names.get(resolved_by_user_id, "The executor"),
+            resolved_to_name=(
+                names.get(resolved_to_user_id) if resolved_to_user_id else None
+            ),
+            notes=notes,
+        )
+    except Exception as exc:  # noqa: BLE001 — a courtesy, never a gate
+        print(f"  ! could not email the claimants about {item_id}: {exc}")
 
     return resolution
