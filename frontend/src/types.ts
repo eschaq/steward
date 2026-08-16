@@ -274,6 +274,17 @@ export const ROLE_HELP: Record<string, string> = {
   beneficiary: 'Can look through the estate and ask for the things that matter to them.',
 }
 
+export interface ClarifyResponse {
+  item: Item
+  /** The re-reading cleared the confidence threshold and the item moved on. */
+  cleared: boolean
+  confidence: number
+  previous_category: string
+  /** The re-reading itself failed — distinct from "looked again, still unsure". */
+  failed: boolean
+  messages: Message[]
+}
+
 export interface ResolutionDetail {
   resolution_id: string
   item_id: string

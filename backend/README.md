@@ -25,6 +25,7 @@ authentication, which is what Cloud Run serves.
 | `photos.py`          | Item photographs in Cloud Storage                                |
 | `marketplace.py`     | **Tier 2** — which marketplace to sell on, and why                |
 | `mailer.py`          | The invitation email, over Gmail SMTP. Best-effort, never a gate  |
+| `clarify.py`         | Answering the agent's question, and re-reading the item with it   |
 | `init_firestore.py`  | Seeds one document per collection and reads it back             |
 | `seed_demo_items.py` | Demo inventory for the dashboard — **not** a test fixture       |
 | `test_membership.py` | Script: invite + accept two users, print each role              |
@@ -165,6 +166,7 @@ The equality assertions compare against `messages.py`'s own copy functions, so
 | `GET  /items/{id}/disposition`        | any accepted member        | `get_disposition` + its listing |
 | `POST /estates/{id}/messages`         | any accepted member        | `post_message`                 |
 | `POST /items/{id}/claim`              | any accepted member        | `record_claim`                 |
+| `POST /items/{id}/clarify`            | any accepted member        | `respond_to_clarification`     |
 | `DELETE /items/{id}/claim`            | the claimant themselves    | `withdraw_claim`               |
 | `POST /items/{id}/resolve`            | executor                   | `resolve_item`                 |
 | `POST /items/{id}/disposition`        | executor                   | `record_disposition_decision`  |
@@ -279,6 +281,64 @@ one.
 **firestore.rules deliberately does not allow `removed`** in its client-writable
 status list. That rule can only check membership, and removal is executor-only,
 so it has to go through this endpoint where `require_role` can see the role.
+
+### Answering the agent's question
+
+`POST /items/{id}/clarify` closes the loop the clarifying question opens. Until
+this existed the agent asked *"can you tell me more about it?"* and nothing
+could be done with a reply — the conversation was one-way.
+
+**Any accepted member**, not just the executor: which uncle owned the carriage
+clock is exactly the thing a family knows and an executor may not. The gate is
+membership. 409 if the item isn't waiting on an answer.
+
+**Not one of the two ADK behaviours.** Those fire on a state transition the
+backend detects, which is what stops them being missed at the mercy of a
+sampling temperature. This one is triggered by a person choosing to answer, so
+it does not belong in that dispatch table — hence `clarify.py` rather than a
+third entry in `TOOL_FOR_STATUS`.
+
+The exchange is **three ordinary Messages in one thread** — question, answer,
+reply. Nothing hidden.
+
+Order of operations matters: **the person's words are posted to the feed before
+the model is called.** If the re-reading then fails, what they said is still
+there where the family can see it; losing someone's words because a call timed
+out would be the worst outcome available.
+
+`classify.classify_with_context()` sends the original photograph *and* the
+family's words together — same client, same schema, same threshold, same failure
+handling as `classify_bytes`. It is the same job with one more input, not a
+second classifier. `photos.fetch_item_photo()` reads the image back out of the
+bucket; an item with only a `file://` entry (seed and test paths) or no
+photograph at all re-reads on the words alone rather than failing.
+
+**The prompt treats the family as evidence, not instruction.** Someone saying
+"it's Georgian silver" does not make it Georgian silver, and a model that simply
+agrees would launder a guess into a fact. The prompt says so explicitly and
+requires confidence to stay low when the answer doesn't actually identify the
+object.
+
+**The four `ai_*` fields are rewritten either way**, because a re-reading that
+stays under the threshold usually still knows more than it did — but status only
+moves when 0.6 is actually cleared.
+
+Three outcomes, three different things said:
+
+```
+cleared     -> "That helps. I had it as unknown; it's down as carriage clock
+                now, and I've put what you said into its notes."
+still unsure -> "Thank you, Test — I've kept what you said with this one. I
+                still can't tell what it is from that — about 50% sure, which
+                isn't enough, so I'm leaving it here rather than filing it as
+                something it might not be."
+call failed  -> "I couldn't get a second look at the photo just now, so I've
+                left this one as it was rather than guess."
+```
+
+The follow-up is deliberately **not** idempotent-once, unlike the opening
+question: a family can answer more than once and each answer earns its own
+reply.
 
 ### Cataloguing a belonging
 

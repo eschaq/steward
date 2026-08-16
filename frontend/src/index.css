@@ -2579,3 +2579,84 @@ h3 {
   }
 }
 
+
+/* --- answering Steward's question ----------------------------------------- */
+
+/* Archive tone, the same one the "needs a look" status uses — this box exists
+   because that status does, and it should read as part of the same thought. */
+.answer {
+  margin-top: 30px;
+  background: var(--archive);
+  border: 1px solid rgba(78, 70, 55, 0.16);
+  border-radius: var(--r-row);
+  padding: 22px 24px 24px;
+}
+
+.answer .eyebrow {
+  display: block;
+  color: var(--on-archive);
+  margin-bottom: 10px;
+}
+
+.answer__label {
+  display: block;
+  font-size: 15.5px;
+  line-height: 1.6;
+  color: var(--on-archive);
+  max-width: 58ch;
+  margin-bottom: 12px;
+}
+
+.answer__text {
+  width: 100%;
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.6;
+  padding: 13px 15px;
+  color: var(--on-surface);
+  background: var(--surface-lowest);
+  border: 1px solid var(--field-border);
+  border-radius: var(--r-row);
+  resize: vertical;
+}
+
+.answer__text:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(142, 72, 49, 0.22);
+}
+
+.answer__text:disabled {
+  opacity: 0.7;
+}
+
+.answer__foot {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.answer__note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--on-archive);
+  opacity: 0.85;
+  max-width: 34ch;
+}
+
+/* Survives the answer box: when an answer succeeds the box unmounts, and this
+   is the only thing left saying what happened. */
+.answer-outcome {
+  margin: 18px 0 0;
+  padding: 14px 18px;
+  background: var(--sage);
+  border: 1px solid var(--sage-outline);
+  border-radius: var(--r-row);
+  font-size: 15.5px;
+  line-height: 1.6;
+  color: var(--on-sage);
+  max-width: 64ch;
+}

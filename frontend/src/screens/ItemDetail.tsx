@@ -9,6 +9,7 @@ import {
   fetchItemMessages,
   fetchMe,
   advanceDisposition,
+  clarifyItem,
   withdrawClaim,
   decideDisposition,
   removeItem,
@@ -17,6 +18,7 @@ import {
   uploadItemPhoto,
 } from '../api'
 import { useAuth } from '../auth'
+import { AnswerSteward } from '../components/AnswerSteward'
 import { Claimants } from '../components/Claimants'
 import { Disposition } from '../components/Disposition'
 import { MessageThread } from '../components/MessageThread'
@@ -58,6 +60,8 @@ export function ItemDetail() {
   const [removing, setRemoving] = useState(false)
   const [advancing, setAdvancing] = useState(false)
   const [withdrawing, setWithdrawing] = useState(false)
+  const [answering, setAnswering] = useState(false)
+  const [answerOutcome, setAnswerOutcome] = useState<string | null>(null)
   const [comment, setComment] = useState('')
 
   const load = useCallback(async () => {
@@ -141,6 +145,32 @@ export function ItemDetail() {
       )
     } finally {
       setDeciding(null)
+    }
+  }
+
+  async function onAnswer(text: string) {
+    setProblem(null)
+    setAnswerOutcome(null)
+    setAnswering(true)
+    try {
+      const result = await clarifyItem(itemId, text)
+      setItem(result.item)
+      // Append rather than refetch: the server already returned both new
+      // messages with their author names resolved, in order.
+      setMessages((current) => [...(current ?? []), ...result.messages])
+      setAnswerOutcome(
+        result.failed
+          ? "Steward couldn't take a second look just now — what you said is saved, and the item is unchanged."
+          : result.cleared
+            ? `Steward has it down as ${result.item.ai_category} now.`
+            : "Steward still isn't sure what this is, so it's staying here. What you said is saved with it.",
+      )
+    } catch (error) {
+      setProblem(
+        error instanceof ApiError ? error.message : `Couldn't send that: ${error}`,
+      )
+    } finally {
+      setAnswering(false)
     }
   }
 
@@ -384,6 +414,23 @@ export function ItemDetail() {
             onAdvance={me?.role === 'executor' ? onAdvance : undefined}
             advancing={advancing}
           />
+
+          {/* Only while the agent is actually waiting. Once the item has been
+              placed there is nothing outstanding to answer, and the ordinary
+              feed is the place for anything else. */}
+          {item.status === 'needs_clarification' && (
+            <AnswerSteward onAnswer={onAnswer} working={answering} />
+          )}
+
+          {/* Outside the box on purpose. A successful answer moves the item out
+              of needs_clarification, which unmounts the box — and a
+              confirmation that disappears at the moment it is earned is worse
+              than none. */}
+          {answerOutcome && (
+            <p className="answer-outcome" role="status">
+              {answerOutcome}
+            </p>
+          )}
 
           <section className="thread-section">
             <h2 className="eyebrow">About this one</h2>

@@ -634,7 +634,28 @@ element headers rather than sixteen banner landmarks — correct as written.
   next thing in the cell, and describing it would make a screen reader say it
   twice.
 
-#### Once you've already asked
+#### Answering Steward
+
+On an item in `needs_clarification`, any accepted member gets a box in the
+thread: *"Tell it what you know — what the thing is, roughly how old, anything
+you remember. It'll look at the photograph again with what you've said."*
+
+**Deliberately not the general compose box.** Both post a Message to the same
+thread, but only this one is read back — what goes in here is handed to the
+classifier with the photograph and may change what the item is recorded as.
+Saying that up front, before they commit, is the difference between a reply and
+a thing that quietly rewrites the catalogue.
+
+The box only appears while the agent is actually waiting. **The outcome line
+sits outside it**, because a successful answer moves the item out of
+`needs_clarification` — which unmounts the box, and a confirmation that
+disappears at the moment it is earned is worse than none. That was a real bug
+caught in verification, not a hypothetical.
+
+Both new messages come back from the endpoint with author names already
+resolved, so the thread appends rather than refetches.
+
+### Once you've already asked
 
 The claim form is replaced by a plain statement — *"You've asked for this one"*,
 with what you said — rather than staying live. It used to stay fully live, so a

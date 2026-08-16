@@ -7,6 +7,7 @@
 
 import { auth, API_BASE_URL } from './firebase'
 import type {
+  ClarifyResponse,
   ClaimListResponse,
   Item,
   ItemListResponse,
@@ -239,6 +240,18 @@ export async function withdrawClaim(itemId: string): Promise<WithdrawResponse> {
     method: 'DELETE',
   })
   return (await response.json()) as WithdrawResponse
+}
+
+/** Answer the agent's question about an item it couldn't place.
+ *
+ * Slow: a real Gemini call, with the original photograph and these words
+ * together. Any accepted member may answer. */
+export async function clarifyItem(itemId: string, text: string): Promise<ClarifyResponse> {
+  const response = await authorizedFetch(`/items/${encodeURIComponent(itemId)}/clarify`, {
+    method: 'POST',
+    body: { text },
+  })
+  return (await response.json()) as ClarifyResponse
 }
 
 export async function uploadItemPhoto(itemId: string, file: File): Promise<Item> {

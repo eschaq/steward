@@ -210,6 +210,85 @@ def post_clarifying_question(
     )
 
 
+def clarification_followup_text(
+    who: str,
+    cleared: bool,
+    before_category: Optional[str],
+    after_category: str,
+    after_notes: str,
+    confidence: float,
+    failed: bool = False,
+) -> str:
+    """What the agent says back after someone answered its question.
+
+    Three outcomes, and the difference between them is the whole point:
+
+    * It cleared the threshold — say what it now thinks it is, and credit the
+      person who said so. No triumph, no "Great news!".
+    * It did not — say that plainly, say what it took from the answer anyway,
+      and leave the item where it is. Thanking someone and then quietly
+      pretending to be sure would be the dishonest version.
+    * The re-reading itself failed — say that, and do not dress a transport
+      error up as an inconclusive answer.
+
+    Same register as the "no pattern yet for this estate" line in overrides.py:
+    the agent is allowed not to know, out loud.
+    """
+    if failed:
+        return (
+            f"Thank you, {who} — I've noted that down. I couldn't get a second "
+            "look at the photo just now, so I've left this one as it was rather "
+            "than guess. Worth trying again in a bit."
+        )
+
+    if cleared:
+        moved = (
+            f"That helps — I've got it down as {after_category} now"
+            if not before_category or before_category.lower() in ("", "unknown")
+            else f"That helps. I had it as {before_category}; it's down as {after_category} now"
+        )
+        return (
+            f"{moved}, and I've put what you said into its notes. "
+            f"{after_notes} It's back with the rest of the inventory."
+        )
+
+    # The number is only worth saying when there is a number worth saying. "0%
+    # sure at best" is technically true and reads like a machine being pointed
+    # at someone who was trying to help.
+    how_sure = (
+        f" — about {int(round(confidence * 100))}% sure, which isn't enough"
+        if confidence >= 0.2
+        else ""
+    )
+    return (
+        f"Thank you, {who} — I've kept what you said with this one. I still "
+        f"can't tell what it is from that{how_sure}, so I'm leaving it here "
+        "rather than filing it as something it might not be. Another detail, or "
+        "a clearer photo, would probably do it."
+    )
+
+
+def post_clarification_followup(
+    estate_id: str, item_id: str, text: str
+) -> Optional[Message]:
+    """Post the agent's reply to a clarification. Deliberately *not* once-only.
+
+    A family can answer more than once, and each answer gets its own reply —
+    unlike the opening question, which should never repeat itself. The id is
+    generated rather than derived from the item.
+    """
+    try:
+        return post_message(
+            estate_id=estate_id,
+            user_id=get_agent_user().id,
+            text=text,
+            item_id=item_id,
+        )
+    except Exception as exc:  # noqa: BLE001 — the re-reading already happened
+        print(f"  ! could not post the clarification follow-up: {exc}")
+        return None
+
+
 def display_names_for(user_ids: list[str]) -> dict[str, str]:
     """Display names for a set of authors, in one pass.
 

@@ -37,6 +37,7 @@ from firebase_app import get_db
 from mailer import SendResult, send_invite_email
 from auth_deps import CallerUid
 from claims import ClaimError, get_claims_for_item, record_claim, withdraw_claim
+from clarify import ClarificationError, respond_to_clarification
 from dispositions import (
     DispositionError,
     advance_disposition,
@@ -1153,6 +1154,60 @@ def post_claim(item_id: str, body: ClaimRequest, uid: CallerUid) -> ClaimRespons
         item_id=claim.item_id,
         user_id=claim.user_id,
         item_status=item_status.value,
+    )
+
+
+class ClarifyRequest(BaseModel):
+    text: str
+
+
+class ClarifyResponse(BaseModel):
+    """What the answer did — enough for the UI to say so without a refetch."""
+
+    item: ItemSummary
+    # Whether the re-reading cleared the confidence threshold and the item moved
+    # out of needs_clarification.
+    cleared: bool
+    confidence: float
+    previous_category: str
+    # True when the re-reading itself failed. Distinct from `cleared: false`,
+    # which means the model looked again and still isn't sure.
+    failed: bool
+    # The two messages this added to the thread, so the client can append rather
+    # than refetch the whole feed.
+    messages: list[MessageResponse]
+
+
+@app.post("/items/{item_id}/clarify", response_model=ClarifyResponse)
+def post_clarify_item(
+    item_id: str, body: ClarifyRequest, uid: CallerUid
+) -> ClarifyResponse:
+    """Answer the agent's question about an item it couldn't place.
+
+    **Any accepted member**, not just the executor: identifying a belonging is
+    exactly the thing a family knows and the executor may not. The gate is
+    membership.
+
+    409 if the item isn't waiting on an answer — the agent asks this question
+    once, and answering something already identified is a state mistake rather
+    than a permission one.
+    """
+    _load_item(item_id)
+    try:
+        result = respond_to_clarification(item_id, uid, body.text)
+    except MembershipError as exc:
+        raise _forbidden(exc) from exc
+    except ClarificationError as exc:
+        raise _conflict(exc) from exc
+
+    added = [m for m in (result.answer, result.reply) if m is not None]
+    return ClarifyResponse(
+        item=_summary(result.item),
+        cleared=result.cleared,
+        confidence=result.confidence,
+        previous_category=result.previous_category,
+        failed=result.failed,
+        messages=_message_responses(added),
     )
 
 

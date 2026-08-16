@@ -66,6 +66,27 @@ def object_path(item_id: str, extension: str) -> str:
     return f"items/{item_id}/{uuid.uuid4().hex}.{extension}"
 
 
+def fetch_item_photo(url: str) -> Optional[tuple[bytes, str]]:
+    """Read a stored photograph back out of the bucket, as (bytes, content type).
+
+    Takes the public URL the item already carries rather than a separate key, so
+    callers work from `photo_urls` without knowing how the path is built.
+    Returns None for anything this bucket did not store — the seed and test
+    paths record local `file://` entries, and an item catalogued before uploads
+    existed has no photograph at all. A missing photo is not an error here; it
+    just means a re-reading has words to go on and no picture.
+    """
+    prefix = f"https://storage.googleapis.com/{BUCKET_NAME}/"
+    if not url.startswith(prefix):
+        return None
+    blob = _bucket().blob(url[len(prefix):])
+    try:
+        data = blob.download_as_bytes()
+    except Exception:  # noqa: BLE001 — an unreadable photo degrades to no photo
+        return None
+    return data, blob.content_type or "image/png"
+
+
 def store_item_photo(item_id: str, data: bytes, content_type: Optional[str]) -> str:
     """Put one photograph in Cloud Storage and return its public URL.
 
