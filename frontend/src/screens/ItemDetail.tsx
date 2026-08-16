@@ -8,6 +8,7 @@ import {
   fetchItemClaims,
   fetchItemMessages,
   fetchMe,
+  advanceDisposition,
   decideDisposition,
   removeItem,
   fetchItemDisposition,
@@ -54,6 +55,7 @@ export function ItemDetail() {
   const [deciding, setDeciding] = useState<DispositionChoice | null>(null)
   const [asking, setAsking] = useState(false)
   const [removing, setRemoving] = useState(false)
+  const [advancing, setAdvancing] = useState(false)
   const [comment, setComment] = useState('')
 
   const load = useCallback(async () => {
@@ -137,6 +139,23 @@ export function ItemDetail() {
       )
     } finally {
       setDeciding(null)
+    }
+  }
+
+  async function onAdvance() {
+    setProblem(null)
+    setAdvancing(true)
+    try {
+      setDisposition(await advanceDisposition(itemId))
+      // The item's status moves to routed on the first step, and the placard
+      // and the chip both read from the item — so refetch rather than guess.
+      setItem(await fetchItem(itemId))
+    } catch (error) {
+      setProblem(
+        error instanceof ApiError ? error.message : `Couldn't note that: ${error}`,
+      )
+    } finally {
+      setAdvancing(false)
     }
   }
 
@@ -306,6 +325,8 @@ export function ItemDetail() {
             canDecide={me?.role === 'executor' && item.status === 'resolved'}
             onDecide={onDecideDisposition}
             working={deciding}
+            onAdvance={me?.role === 'executor' ? onAdvance : undefined}
+            advancing={advancing}
           />
 
           <section className="thread-section">

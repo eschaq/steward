@@ -57,10 +57,22 @@ ALL_ITEMS = [ITEM_DONATE, ITEM_SELL, ITEM_UNCERTAIN, ITEM_UNRESOLVED]
 
 
 def clear_decision(item_id: str) -> None:
-    """Drop both documents a decision writes, so this run starts from nothing."""
+    """Undo a decision entirely, so this run starts from nothing.
+
+    Both documents, *and* the effect the decision had on the item. Advancing a
+    disposition moves the item to `routed`; dropping the Disposition without
+    putting that back would leave a routed item with nothing routing it, and the
+    next decision would be refused because only a resolved item is eligible.
+    """
     db = get_db()
     db.collection(OverrideLog.COLLECTION).document(override_log_id(item_id)).delete()
     db.collection(Disposition.COLLECTION).document(disposition_id(item_id)).delete()
+
+    snapshot = db.collection(Item.COLLECTION).document(item_id).get()
+    if snapshot.exists and snapshot.to_dict().get("status") == ItemStatus.ROUTED.value:
+        db.collection(Item.COLLECTION).document(item_id).update(
+            {"status": ItemStatus.RESOLVED.value}
+        )
 
 
 def read_item(item_id: str) -> Item:

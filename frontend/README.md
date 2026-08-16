@@ -580,6 +580,27 @@ element headers rather than sixteen banner landmarks — correct as written.
   next thing in the cell, and describing it would make a screen reader say it
   twice.
 
+### Getting it out of the house
+
+Once a disposition exists, the "Where it goes" panel says how far along it
+actually is and offers the next step — in the words of the thing that happens,
+never the raw enum:
+
+| Channel | pending → | in_progress → |
+| --- | --- | --- |
+| donate | Mark it as dropped off | Mark it as taken |
+| discard | Mark it as taken out | Mark it as gone |
+| sell | Mark it as listed | Mark it as sold |
+
+The panel reads *"Not dropped off yet"* → *"Dropped off"* → *"Given away —
+August 16, 2026"*, and the button disappears at the end because there is nothing
+further to mark. Beneficiaries see the progress and never the button.
+
+**The review table's "Where it goes" column now follows the tense too.** It used
+to say "Given away" about something still sitting in the hall — the honest
+failing of the first version. It now reads *To give away* → *Dropped off* →
+*Given away*, and *To sell on eBay* → *Listed on eBay* → *Sold on eBay*.
+
 ## Taking one off the list
 
 A quiet underlined "Take this off the list" at the **bottom** of the item page,

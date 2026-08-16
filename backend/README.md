@@ -167,10 +167,47 @@ The equality assertions compare against `messages.py`'s own copy functions, so
 | `POST /items/{id}/claim`              | any accepted member        | `record_claim`                 |
 | `POST /items/{id}/resolve`            | executor                   | `resolve_item`                 |
 | `POST /items/{id}/disposition`        | executor                   | `record_disposition_decision`  |
+| `POST /items/{id}/disposition/advance`| executor                   | `advance_disposition`          |
 | `POST /items/{id}/photo`              | executor                   | `store_item_photo`             |
 | `POST /items/{id}/marketplace-listing`| executor                   | `recommend_channel`            |
 | `POST /items/{id}/remove`             | executor                   | `remove_item` (soft delete)    |
 | `POST /items/{id}/agent-message`      | any accepted member        | `run_behavior_for_item`        |
+
+### Getting it out of the house
+
+`POST /items/{id}/disposition/advance` moves a Disposition one step:
+`pending → in_progress → completed`. Executor only. Nested under the disposition
+rather than a top-level verb, because what moves is the Disposition — the item's
+status changing is a consequence.
+
+**One step per call.** Each step corresponds to something that happened in the
+world (the charity shop has it; the charity shop has taken it), so skipping to
+the end would record an event nobody witnessed.
+
+**`in_progress` sets the item to `routed`** — the only place anything sets it.
+Nothing else in the codebase reads `routed`: the three status gates are
+allow-lists that exclude it, so a routed item is already out of claiming,
+resolving and suggestion recompute.
+
+**Completion gets no new Item status, and that is a reading of the data model
+doc rather than an omission.** Disposition is given its own `status` and
+`completed_at` precisely so the fulfilment lifecycle lives there, and the doc's
+own note says every tier's detail "lives in tables that reference Disposition,
+never in Item/Claim/Comment/Resolution themselves". An eighth Item status
+meaning "gone" would push disposition detail back up into Item — the exact thing
+the seam exists to prevent — and would create a second source of truth that
+could disagree with `completed_at`. Item.status answers *where did this land in
+the claim flow*; Disposition answers *and has it actually gone yet*.
+
+Errors follow the house pattern: 403 `MembershipError` for a non-executor, 409
+`DispositionError` for no disposition yet or one already completed, 404 for no
+such item (checked before anything else — a missing item is not a state
+conflict).
+
+`test_dispositions.clear_decision` now also puts a `routed` item back to
+`resolved`. Dropping the Disposition without undoing its effect left a routed
+item with nothing routing it, and the next decision was refused because only a
+resolved item is eligible — which `test_marketplace` caught.
 
 ### Taking an item off the list
 

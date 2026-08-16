@@ -257,6 +257,16 @@ export async function decideDisposition(
 }
 
 /** Ask Steward where to list it. Only meaningful after a `sell` decision. */
+/** Mark the next thing that actually happened to a disposition. Executor only,
+ * one step per call. */
+export async function advanceDisposition(itemId: string): Promise<DispositionDetail> {
+  const response = await authorizedFetch(
+    `/items/${encodeURIComponent(itemId)}/disposition/advance`,
+    { method: 'POST' },
+  )
+  return (await response.json()) as DispositionDetail
+}
+
 export async function requestListing(itemId: string): Promise<ListingDetail> {
   const response = await authorizedFetch(
     `/items/${encodeURIComponent(itemId)}/marketplace-listing`,

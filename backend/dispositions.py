@@ -20,6 +20,8 @@ item would be answering the wrong question.
 
 from typing import Optional
 
+from google.cloud import firestore as gcf
+
 from firebase_app import get_db
 from membership import MembershipRole, require_role
 from models import (
@@ -68,6 +70,85 @@ def get_disposition_decision(item_id: str) -> Optional[OverrideLog]:
     if not snapshot.exists:
         return None
     return OverrideLog.model_validate(snapshot.to_dict())
+
+
+# What comes after what. `completed` is terminal — there is no "un-donate".
+NEXT_STATUS = {
+    DispositionStatus.PENDING: DispositionStatus.IN_PROGRESS,
+    DispositionStatus.IN_PROGRESS: DispositionStatus.COMPLETED,
+}
+
+
+def advance_disposition(item_id: str, uid: str) -> Disposition:
+    """Move a disposition one step along: pending -> in_progress -> completed.
+
+    Executor only. One step per call, deliberately — each step corresponds to
+    something that actually happened in the world (the charity shop has it now;
+    the charity shop has taken it), and skipping to the end would record an
+    event nobody witnessed.
+
+    **The item's status becomes `routed` at in_progress and stays there.** This
+    is the only place anything sets `routed`, and nothing else in the codebase
+    reads it: the three status gates (CLAIMABLE_STATUSES, RESOLVABLE_STATUSES,
+    SUGGESTION_ELIGIBLE_STATUSES) are allow-lists that exclude it, so a routed
+    item is already out of claiming, resolving and suggestion recompute.
+
+    **Completion does not get its own Item status**, and that is a deliberate
+    reading of the data model doc rather than an omission. Disposition is given
+    its own `status` and `completed_at` precisely so the fulfilment lifecycle
+    lives there; the doc's own note says every tier's detail "lives in tables
+    that reference Disposition, never in Item/Claim/Comment/Resolution
+    themselves". An eighth Item status meaning "gone" would push disposition
+    detail back up into Item — the exact thing the seam exists to prevent — and
+    would create a second source of truth that could disagree with
+    `Disposition.completed_at`. Item.status answers "where did this land in the
+    claim flow"; Disposition answers "and has it actually gone yet".
+
+    Raises `MembershipError` if the caller is not the executor of this item's
+    estate, and `DispositionError` if there is no disposition yet or it is
+    already completed. Nothing is written in either case.
+    """
+    db = get_db()
+    snapshot = db.collection(Item.COLLECTION).document(item_id).get()
+    if not snapshot.exists:
+        raise DispositionError(f"No item {item_id} to move along.")
+    item = Item.model_validate(snapshot.to_dict())
+
+    # Authorization first, so a non-executor isn't told about the item's state.
+    require_role(uid, item.estate_id, MembershipRole.EXECUTOR)
+
+    disposition = get_disposition(item_id)
+    if disposition is None:
+        raise DispositionError(
+            f"Item {item_id} has no disposition yet — the executor decides where "
+            "it goes before there is anything to move along."
+        )
+
+    if disposition.status not in NEXT_STATUS:
+        raise DispositionError(
+            f"Item {item_id} is already {disposition.status.value} — there is "
+            "nothing further to mark."
+        )
+
+    nxt = NEXT_STATUS[disposition.status]
+    updates: dict = {"status": nxt.value}
+    if nxt is DispositionStatus.COMPLETED:
+        updates["completed_at"] = gcf.SERVER_TIMESTAMP
+
+    batch = db.batch()
+    batch.update(
+        db.collection(Disposition.COLLECTION).document(disposition.id), updates
+    )
+    # Only on the first step. At completion the item is already routed, and
+    # rewriting the same value would be a write that says nothing.
+    if nxt is DispositionStatus.IN_PROGRESS:
+        batch.update(
+            db.collection(Item.COLLECTION).document(item_id),
+            {"status": ItemStatus.ROUTED.value},
+        )
+    batch.commit()
+
+    return get_disposition(item_id)
 
 
 def get_disposition(item_id: str) -> Optional[Disposition]:

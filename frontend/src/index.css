@@ -2393,3 +2393,19 @@ h3 {
   color: var(--on-surface-variant);
   max-width: 62ch;
 }
+
+/* How far along a disposition has actually got. */
+.disposition__progress {
+  margin: 6px 0 0;
+  font-size: 15.5px;
+  line-height: 1.6;
+  color: var(--on-sage-variant);
+}
+
+.disposition__when {
+  color: var(--on-sage-variant);
+}
+
+.disposition__advance {
+  margin-top: 16px;
+}

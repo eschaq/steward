@@ -39,6 +39,7 @@ from auth_deps import CallerUid
 from claims import ClaimError, get_claims_for_item, record_claim
 from dispositions import (
     DispositionError,
+    advance_disposition,
     disposition_id,
     get_disposition,
     record_disposition_decision,
@@ -744,6 +745,36 @@ def get_item_disposition(item_id: str, uid: CallerUid) -> Optional[DispositionDe
     if disposition is None:
         return None
     return _as_disposition_detail(disposition, get_listing(disposition.id))
+
+
+@app.post("/items/{item_id}/disposition/advance", response_model=DispositionDetail)
+def post_advance_disposition(item_id: str, uid: CallerUid) -> DispositionDetail:
+    """Mark the next thing that actually happened: pending -> in_progress ->
+    completed. Executor only.
+
+    A nested path under the disposition rather than a top-level verb, because
+    what moves is the Disposition, not the item — the item's status changing to
+    `routed` is a consequence. One step per call: the caller says "this
+    happened", not "skip to the end".
+
+    403 if the caller is not the executor; 409 if there is no disposition yet or
+    it is already completed — the same MembershipError / DispositionError split
+    every other write here uses.
+    """
+    # Load first purely for the 404: advance_disposition would report a missing
+    # item as a state conflict, and "no such item" is not a conflict.
+    _load_item(item_id)
+    try:
+        disposition = advance_disposition(item_id, uid)
+    except MembershipError as exc:
+        raise _forbidden(exc) from exc
+    except DispositionError as exc:
+        raise _conflict(exc) from exc
+
+    detail = _as_disposition_detail(disposition, get_listing(disposition.id))
+    if detail is None:
+        raise HTTPException(status_code=500, detail="The disposition vanished mid-update.")
+    return detail
 
 
 @app.post("/items/{item_id}/marketplace-listing", response_model=ListingDetail)

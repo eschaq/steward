@@ -1,7 +1,10 @@
 import { useState } from 'react'
 
 import {
+  ADVANCE_ACTION,
   CHANNEL_LABEL,
+  CHANNEL_SHORT,
+  DISPOSITION_PROGRESS,
   DISPOSITION_CHOICES,
   DISPOSITION_HELP,
   DISPOSITION_LABEL,
@@ -33,23 +36,63 @@ export function Disposition({
   canDecide,
   onDecide,
   working,
+  onAdvance,
+  advancing,
 }: {
   decided: DispositionDetail | null
   canDecide: boolean
   onDecide: (choice: DispositionChoice) => void | Promise<void>
   /** The choice currently being recorded — "sell" also waits on Steward. */
   working: DispositionChoice | null
+  /** Mark the next thing that actually happened. Executor only. */
+  onAdvance?: () => void | Promise<void>
+  advancing?: boolean
 }) {
   const [chosen, setChosen] = useState<DispositionChoice | null>(null)
 
   if (decided) {
     const listing = decided.listing
+    const done = decided.status === 'completed'
+    // Once it has actually gone, the heading says so. "Being given away" over
+    // "Given away" is both redundant and, by then, untrue.
+    const heading = done
+      ? (CHANNEL_SHORT[decided.channel] ?? decided.channel)
+      : (CHANNEL_LABEL[decided.channel] ?? decided.channel)
+    const when = decided.completed_at
+      ? new Date(decided.completed_at).toLocaleDateString(undefined, {
+          month: 'long',
+          day: 'numeric',
+          year: 'numeric',
+        })
+      : null
     return (
       <section className="disposition disposition--done">
         <h2 className="eyebrow">Where it goes</h2>
-        <p className="disposition__what">
-          {CHANNEL_LABEL[decided.channel] ?? decided.channel}
+        <p className="disposition__what">{heading}</p>
+
+        {/* Where it has actually got to, in the words of the thing that
+            happened — never the raw pending/in_progress/completed. Once it is
+            done the heading carries that, so this is just the date. */}
+        <p className="disposition__progress">
+          {done
+            ? (when ?? 'Done')
+            : (DISPOSITION_PROGRESS[decided.channel]?.[decided.status] ?? decided.status)}
         </p>
+
+        {onAdvance && decided.status !== 'completed' && (
+          <button
+            className="button button--sage disposition__advance"
+            type="button"
+            disabled={advancing}
+            onClick={() => void onAdvance()}
+          >
+            {advancing
+              ? 'Noting it…'
+              : decided.status === 'pending'
+                ? (ADVANCE_ACTION[decided.channel]?.next ?? 'Mark the next step')
+                : (ADVANCE_ACTION[decided.channel]?.last ?? 'Mark it done')}
+          </button>
+        )}
 
         {listing && (
           <div className="listing">

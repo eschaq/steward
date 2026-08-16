@@ -341,21 +341,73 @@ export const DISPOSITION_HELP: Record<DispositionChoice, string> = {
 /** The same four destinations, short enough for a table cell. `whereItGoes()`
  * is what screens should call — it folds in the marketplace platform, so a sold
  * piece names where rather than just saying it is being sold. */
+/** What was decided, before anything has happened yet. */
+export const CHANNEL_INTENDED: Record<string, string> = {
+  donate: 'To give away',
+  discard: 'To let go',
+  sell_marketplace: 'To sell',
+  sell_auction_bulk: 'To auction',
+}
+
+/** Underway. */
+export const CHANNEL_IN_PROGRESS: Record<string, string> = {
+  donate: 'Dropped off',
+  discard: 'Taken out',
+  sell_marketplace: 'Listed',
+  sell_auction_bulk: 'With the auction house',
+}
+
+/** Done. */
 export const CHANNEL_SHORT: Record<string, string> = {
   donate: 'Given away',
   discard: 'Let go',
   sell_marketplace: 'Sold',
-  sell_auction_bulk: 'Auction',
+  sell_auction_bulk: 'Sold at auction',
 }
 
 export function whereItGoes(disposition: DispositionDetail | null): string | null {
   if (!disposition) return null
-  const short = CHANNEL_SHORT[disposition.channel] ?? disposition.channel
   const platform = disposition.listing?.platform
-  if (disposition.channel === 'sell_marketplace' && platform) {
-    return `Sold via ${PLATFORM_LABEL[platform] ?? platform}`
+  const where =
+    disposition.channel === 'sell_marketplace' && platform
+      ? (PLATFORM_LABEL[platform] ?? platform)
+      : null
+
+  // Tense follows the disposition's own status, now that it moves. Saying
+  // "Given away" about something still sitting in the hall was the honest
+  // failing of the first version of this column.
+  switch (disposition.status) {
+    case 'completed':
+      return where ? `Sold on ${where}` : (CHANNEL_SHORT[disposition.channel] ?? disposition.channel)
+    case 'in_progress':
+      return where
+        ? `Listed on ${where}`
+        : (CHANNEL_IN_PROGRESS[disposition.channel] ?? 'On its way')
+    default:
+      return where
+        ? `To sell on ${where}`
+        : (CHANNEL_INTENDED[disposition.channel] ?? 'Decided')
   }
-  return short
+}
+
+/** What the executor is being asked to confirm, in the words of the thing that
+ * actually happens — never `in_progress` / `completed`.
+ *
+ * Keyed by channel, because "picked up" and "sold" are different events even
+ * though they are the same enum value underneath. */
+export const ADVANCE_ACTION: Record<string, { next: string; last: string }> = {
+  donate: { next: 'Mark it as dropped off', last: 'Mark it as taken' },
+  discard: { next: 'Mark it as taken out', last: 'Mark it as gone' },
+  sell_marketplace: { next: 'Mark it as listed', last: 'Mark it as sold' },
+  sell_auction_bulk: { next: 'Mark it as sent to auction', last: 'Mark it as sold' },
+}
+
+/** Where a disposition has got to, said plainly. */
+export const DISPOSITION_PROGRESS: Record<string, Record<string, string>> = {
+  donate: { pending: 'Not dropped off yet', in_progress: 'Dropped off', completed: 'Given away' },
+  discard: { pending: 'Not taken out yet', in_progress: 'Taken out', completed: 'Gone' },
+  sell_marketplace: { pending: 'Not listed yet', in_progress: 'Listed', completed: 'Sold' },
+  sell_auction_bulk: { pending: 'Not sent yet', in_progress: 'With the auction house', completed: 'Sold' },
 }
 
 export const CHANNEL_LABEL: Record<string, string> = {
