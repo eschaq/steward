@@ -77,7 +77,13 @@ export function Dashboard() {
 
   const total = items?.length ?? 0
   // A ledger, not a score: how many things are where, with no target to hit.
-  const settled = counts.resolved + counts.routed
+  //
+  // "Settled" means exactly `resolved`, the same as the status chip and the
+  // filter tab. It used to fold in `routed` as well, so this card and the tab
+  // beneath it disagreed on the same screen (14 against 13). `Settled` and
+  // `On its way` are two distinct words this app teaches people — a card using
+  // one of them to mean both is the bug, not the tab.
+  const settled = counts.resolved
 
   // A block with nothing in it drops to the quiet tone. A big clay-red 0 would
   // be shouting about an absence of anything to shout about.

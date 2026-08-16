@@ -580,7 +580,25 @@ element headers rather than sixteen banner landmarks — correct as written.
   next thing in the cell, and describing it would make a screen reader say it
   twice.
 
-### Taking your name back
+#### Once you've already asked
+
+The claim form is replaced by a plain statement — *"You've asked for this one"*,
+with what you said — rather than staying live. It used to stay fully live, so a
+second click filed a genuine second Claim document for the same person.
+
+The data model allows repeat claims **on purpose** (a second one is usually a
+revised comment, and status counts distinct claimants so it never escalates
+anything). But a form that looks untouched is not someone deciding to ask twice
+— it is someone who thinks the first click didn't register. The backend rule is
+right; the UI was hiding it.
+
+**No separate edit path was built.** Changing your comment means taking your
+name back off and asking again, which the copy says out loud. Withdraw-then-
+reclaim would otherwise have been the *implementation* of an edit button, and it
+resets `claimed_at` — which decides the order the mediation message names people
+in. Better to make that a visible choice than a hidden side effect.
+
+## Taking your name back
 
 The withdraw affordance lives on **your own row** in "Who's asked", not as an
 action on the item — changing your mind, or standing aside so a sibling can have
@@ -593,7 +611,7 @@ Afterwards the claimant list and the status chip both update from a refetch, wit
 no page reload — the server owns the 0/1/2+ rule, so the client asks rather than
 computes.
 
-**A pre-existing bug this surfaced.** `CLAIMABLE_STATUSES` was
+**Another pre-existing bug this surfaced.** `CLAIMABLE_STATUSES` was
 `['unclaimed', 'contested']` — `claimed` was missing, so once one person had
 asked for something *nobody else could ask through the UI*. The contested flow,
 which is the centre of the whole product, was only reachable by script. It now

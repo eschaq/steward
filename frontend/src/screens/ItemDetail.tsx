@@ -209,6 +209,9 @@ export function ItemDetail() {
   const photo = firstPhoto(item?.photo_urls)
   const usablePhoto = Boolean(photo)
   const claimable = Boolean(item && isClaimable(item.status))
+  // Your own claim, if you have one. `is_you` is resolved server-side, so this
+  // does not depend on the client knowing its own uid.
+  const yours = claims?.find((claim) => claim.is_you) ?? null
 
   return (
     <main className="page">
@@ -317,7 +320,31 @@ export function ItemDetail() {
                   </div>
                 )}
 
-              {claimable && (
+              {/* Already asked: say so, rather than leaving a live form that
+                  quietly files a second claim for the same person. The data
+                  model allows repeat claims on purpose — a second one is a real
+                  event — but a form that looks untouched is not someone
+                  deciding to ask twice, it is someone who thinks the first
+                  click failed. */}
+              {claimable && yours && (
+                <div className="claim claim--yours">
+                  <p className="claim__already">You've asked for this one.</p>
+                  {yours.comment ? (
+                    <p className="claim__yours-comment">“{yours.comment}”</p>
+                  ) : (
+                    <p className="claim__yours-silent">
+                      You asked without saying why, which is allowed.
+                    </p>
+                  )}
+                  <p className="claim__yours-note">
+                    Want to say something different? Take your name back off
+                    below, then ask again — or just add to the conversation
+                    underneath.
+                  </p>
+                </div>
+              )}
+
+              {claimable && !yours && (
                 <div className="claim">
                   <label htmlFor="claim-comment" className="claim__label">
                     Say why, if you'd like to. Nobody has to.

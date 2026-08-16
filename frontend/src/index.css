@@ -2448,3 +2448,46 @@ h3 {
   gap: 10px;
   flex-wrap: wrap;
 }
+
+/* You have already asked for this one. */
+.claim--yours {
+  background: var(--clay-tint);
+  border: 1px solid transparent;
+  border-radius: var(--r-row);
+  padding: 16px 18px 18px;
+}
+
+.claim__already {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--on-clay-tint);
+}
+
+.claim__yours-comment {
+  margin: 10px 0 0;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--on-clay-tint);
+  max-width: 54ch;
+}
+
+.claim__yours-silent {
+  margin: 10px 0 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--on-clay-tint);
+  opacity: 0.82;
+}
+
+.claim__yours-note {
+  margin: 12px 0 0;
+  padding-top: 11px;
+  border-top: 1px solid rgba(116, 52, 30, 0.22);
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--on-clay-tint);
+  opacity: 0.9;
+  max-width: 54ch;
+}
