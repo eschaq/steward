@@ -226,6 +226,21 @@ export async function removeItem(itemId: string): Promise<Item> {
   return (await response.json()) as Item
 }
 
+export interface WithdrawResponse {
+  item_id: string
+  withdrawn: number
+  status: string
+}
+
+/** Take your own name back off an item. You can only ever withdraw your own —
+ * the server reads the caller from the token, not from anything sent. */
+export async function withdrawClaim(itemId: string): Promise<WithdrawResponse> {
+  const response = await authorizedFetch(`/items/${encodeURIComponent(itemId)}/claim`, {
+    method: 'DELETE',
+  })
+  return (await response.json()) as WithdrawResponse
+}
+
 export async function uploadItemPhoto(itemId: string, file: File): Promise<Item> {
   const form = new FormData()
   form.append('file', file)

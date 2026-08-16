@@ -165,6 +165,7 @@ The equality assertions compare against `messages.py`'s own copy functions, so
 | `GET  /items/{id}/disposition`        | any accepted member        | `get_disposition` + its listing |
 | `POST /estates/{id}/messages`         | any accepted member        | `post_message`                 |
 | `POST /items/{id}/claim`              | any accepted member        | `record_claim`                 |
+| `DELETE /items/{id}/claim`            | the claimant themselves    | `withdraw_claim`               |
 | `POST /items/{id}/resolve`            | executor                   | `resolve_item`                 |
 | `POST /items/{id}/disposition`        | executor                   | `record_disposition_decision`  |
 | `POST /items/{id}/disposition/advance`| executor                   | `advance_disposition`          |
@@ -172,6 +173,42 @@ The equality assertions compare against `messages.py`'s own copy functions, so
 | `POST /items/{id}/marketplace-listing`| executor                   | `recommend_channel`            |
 | `POST /items/{id}/remove`             | executor                   | `remove_item` (soft delete)    |
 | `POST /items/{id}/agent-message`      | any accepted member        | `run_behavior_for_item`        |
+
+### Taking your name back off
+
+`DELETE /items/{id}/claim` withdraws the caller's own claim. **DELETE, and it
+means it** — unlike `/items/{id}/remove`, the Claim documents genuinely go away.
+There is no withdrawn flag on Claim in the data model, and inventing one would
+be a schema change to record an absence the collection already expresses by not
+containing the row.
+
+**The claimant's own call, not the executor's.** A caller can only ever withdraw
+their own claim because the uid comes from their verified token and never from
+the path or the body — "not someone else's" is structural here, not a check that
+could be forgotten.
+
+**It removes every claim that person has on the item, not one row.** Repeat
+claims are deliberately allowed (a second is usually a revised comment), so
+someone can hold more than one; they are withdrawing their interest, and leaving
+a stray row would leave their name on the item.
+
+Status comes back through `recompute_item_status` — the same function
+`record_claim` uses, so the way down is the way up in reverse with no second
+copy of the 0/1/2+ rule. Dropping a contested item to one claimant lands on
+`claimed` because `status_for_claimant_count` counts distinct claimants and does
+not care which direction it is moving. Mediation posts only on the transition
+*into* contested, so coming back down says nothing.
+
+404 for no such item, and for having no claim to take back — asking to withdraw
+something you never put down is a mistake worth naming.
+
+**The mediation message stays.** Messages are append-only, and the agent did say
+that at the time — deleting it would rewrite history and orphan any replies. But
+"leave it" alone was not the whole answer: the item detail view already gates the
+prominent "A way through" treatment on `item.status === 'contested'`, so once the
+item settles back down the mediation demotes itself to an ordinary thread entry.
+The record is kept; the live prompt is not. Verified: after a withdrawal the
+thread still holds the message and nothing is highlighted.
 
 ### Getting it out of the house
 

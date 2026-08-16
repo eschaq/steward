@@ -36,7 +36,7 @@ from agent import AgentError, run_behavior_for_item
 from firebase_app import get_db
 from mailer import SendResult, send_invite_email
 from auth_deps import CallerUid
-from claims import ClaimError, get_claims_for_item, record_claim
+from claims import ClaimError, get_claims_for_item, record_claim, withdraw_claim
 from dispositions import (
     DispositionError,
     advance_disposition,
@@ -110,7 +110,10 @@ ALLOWED_ORIGINS = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_methods=["GET", "POST"],
+    # DELETE arrived with claim withdrawal. Still an explicit list rather than
+    # "*": nothing here should ever be reachable by PUT or PATCH, and the
+    # browser's preflight is where that gets enforced.
+    allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["Authorization", "Content-Type"],
 )
 
@@ -1151,6 +1154,49 @@ def post_claim(item_id: str, body: ClaimRequest, uid: CallerUid) -> ClaimRespons
         user_id=claim.user_id,
         item_status=item_status.value,
     )
+
+
+class WithdrawResponse(BaseModel):
+    item_id: str
+    # How many claim documents came off — more than one when the person had
+    # claimed twice, which the data model deliberately allows.
+    withdrawn: int
+    # The item's status afterwards, so the caller doesn't have to refetch to
+    # know whether a contested item just settled back down.
+    status: str
+
+
+@app.delete("/items/{item_id}/claim", response_model=WithdrawResponse)
+def delete_item_claim(item_id: str, uid: CallerUid) -> WithdrawResponse:
+    """Take your own name back off an item.
+
+    **DELETE, and it means it** — unlike `/items/{id}/remove`, the Claim
+    documents genuinely go away. There is no withdrawn flag on Claim in the data
+    model, and inventing one would be a schema change to record an absence the
+    collection can already express by not containing the row.
+
+    **The claimant's own call, not the executor's.** Any accepted member may do
+    this, and a caller can only ever withdraw their own claim because the uid
+    comes from their verified token and never from the path or the body — the
+    "not someone else's" guarantee is structural here, not a check that could be
+    forgotten.
+
+    404 if there is no such item, or if this person has no claim on it: asking
+    to take back something you never put down is a mistake worth naming rather
+    than a silent success.
+    """
+    item = _load_item(item_id)
+    try:
+        require_role(uid, item.estate_id)
+    except MembershipError as exc:
+        raise _forbidden(exc) from exc
+
+    try:
+        withdrawn, status = withdraw_claim(item_id, uid)
+    except ClaimError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    return WithdrawResponse(item_id=item_id, withdrawn=withdrawn, status=status.value)
 
 
 @app.post("/items/{item_id}/photo", response_model=ItemSummary)

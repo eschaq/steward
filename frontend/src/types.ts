@@ -163,11 +163,18 @@ export function isListedStatus(value: string): value is ItemStatus {
 
 /** Statuses where the signed-in member can still put their name forward.
  *
- * `contested` is included on purpose: a third person asking is a real thing that
- * happens, and the claim flow records it rather than blocking it. Everything
- * past that — settled, on its way — is the executor's decision, already made.
+ * Mirrors the backend's own CLAIMABLE_STATUSES. `claimed` belongs here: one
+ * person having asked is precisely when a second person asking matters, and
+ * leaving it out made the contested flow unreachable from the UI — the item
+ * could only ever become contested through a script. `contested` is here for the
+ * same reason, a step further along. Everything past that — settled, on its way
+ * — is the executor's decision, already made.
  */
-export const CLAIMABLE_STATUSES: readonly ItemStatus[] = ['unclaimed', 'contested']
+export const CLAIMABLE_STATUSES: readonly ItemStatus[] = [
+  'unclaimed',
+  'claimed',
+  'contested',
+]
 
 export function isClaimable(status: string): boolean {
   return (CLAIMABLE_STATUSES as readonly string[]).includes(status)

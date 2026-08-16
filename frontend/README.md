@@ -580,6 +580,25 @@ element headers rather than sixteen banner landmarks — correct as written.
   next thing in the cell, and describing it would make a screen reader say it
   twice.
 
+### Taking your name back
+
+The withdraw affordance lives on **your own row** in "Who's asked", not as an
+action on the item — changing your mind, or standing aside so a sibling can have
+something, is an ordinary thing to do rather than a decision about the object. A
+quiet "Take back your name" opens a plain question: *"Take your name back off
+this one? You can always put it down again later."* with **Yes, take it back** /
+**Keep it**.
+
+Afterwards the claimant list and the status chip both update from a refetch, with
+no page reload — the server owns the 0/1/2+ rule, so the client asks rather than
+computes.
+
+**A pre-existing bug this surfaced.** `CLAIMABLE_STATUSES` was
+`['unclaimed', 'contested']` — `claimed` was missing, so once one person had
+asked for something *nobody else could ask through the UI*. The contested flow,
+which is the centre of the whole product, was only reachable by script. It now
+mirrors the backend's own set.
+
 ### Getting it out of the house
 
 Once a disposition exists, the "Where it goes" panel says how far along it

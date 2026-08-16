@@ -128,6 +128,44 @@ def recompute_item_status(item_id: str) -> ItemStatus:
     return new_status
 
 
+def withdraw_claim(item_id: str, user_id: str) -> tuple[int, ItemStatus]:
+    """Take a person's name back off an item, and recompute the item's status.
+
+    Returns how many claim documents were removed and the item's status
+    afterwards.
+
+    **Removes every claim that person has on this item, not one row.** Repeat
+    claims are allowed (a second one is usually a revised comment), so someone
+    can hold more than one. They are withdrawing their interest, not one
+    document — leaving a stray row would leave their name on the item, which is
+    the opposite of what they asked for.
+
+    Status comes back through `recompute_item_status`, the same function
+    `record_claim` uses, so the way down is the way up in reverse and there is
+    no second copy of the 0/1/2+ rule to drift. Dropping a contested item to one
+    claimant lands on `claimed` because `status_for_claimant_count` counts
+    distinct claimants and doesn't care which direction it is moving.
+
+    Raises `ClaimError` if the item does not exist, or if this person has no
+    claim on it — asking to withdraw something you never put down is a mistake
+    worth surfacing rather than a silent no-op.
+    """
+    db = get_db()
+    if not db.collection(Item.COLLECTION).document(item_id).get().exists:
+        raise ClaimError(f"No item {item_id} to withdraw a claim from.")
+
+    mine = [claim for claim in get_claims_for_item(item_id) if claim.user_id == user_id]
+    if not mine:
+        raise ClaimError(f"You have no claim on item {item_id} to take back.")
+
+    batch = db.batch()
+    for claim in mine:
+        batch.delete(db.collection(Claim.COLLECTION).document(claim.id))
+    batch.commit()
+
+    return len(mine), recompute_item_status(item_id)
+
+
 def record_claim(
     item_id: str, user_id: str, comment: Optional[str] = None
 ) -> tuple[Claim, ItemStatus]:

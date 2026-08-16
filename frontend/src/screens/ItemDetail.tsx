@@ -9,6 +9,7 @@ import {
   fetchItemMessages,
   fetchMe,
   advanceDisposition,
+  withdrawClaim,
   decideDisposition,
   removeItem,
   fetchItemDisposition,
@@ -56,6 +57,7 @@ export function ItemDetail() {
   const [asking, setAsking] = useState(false)
   const [removing, setRemoving] = useState(false)
   const [advancing, setAdvancing] = useState(false)
+  const [withdrawing, setWithdrawing] = useState(false)
   const [comment, setComment] = useState('')
 
   const load = useCallback(async () => {
@@ -139,6 +141,29 @@ export function ItemDetail() {
       )
     } finally {
       setDeciding(null)
+    }
+  }
+
+  async function onWithdraw() {
+    setProblem(null)
+    setWithdrawing(true)
+    try {
+      await withdrawClaim(itemId)
+      // Both change: the list loses your row, and the status may drop from
+      // contested back to claimed — or to unclaimed if you were the only one.
+      // Refetch rather than compute it here; the server owns that rule.
+      const [fetched, asked] = await Promise.all([
+        fetchItem(itemId),
+        fetchItemClaims(itemId),
+      ])
+      setItem(fetched)
+      setClaims(asked.claims)
+    } catch (error) {
+      setProblem(
+        error instanceof ApiError ? error.message : `Couldn't take that back: ${error}`,
+      )
+    } finally {
+      setWithdrawing(false)
     }
   }
 
@@ -318,7 +343,11 @@ export function ItemDetail() {
             </div>
           </article>
 
-          <Claimants claims={claims ?? []} />
+          <Claimants
+            claims={claims ?? []}
+            onWithdraw={onWithdraw}
+            withdrawing={withdrawing}
+          />
 
           <Disposition
             decided={disposition}
