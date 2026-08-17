@@ -285,6 +285,35 @@ export interface ClarifyResponse {
   messages: Message[]
 }
 
+export interface OverrideEntry {
+  item_id: string
+  item_category: string
+  ai_suggested_disposition: string
+  executor_chosen_disposition: string
+  created_at: string
+  /** Whether Steward had actually formed a view. Early entries are `uncertain`,
+   * which must never be rendered as "Steward suggested uncertain". */
+  steward_had_a_view: boolean
+  agreed: boolean
+}
+
+export interface CategoryPattern {
+  category: string
+  total: number
+  counts: Record<string, number>
+  leaning: string | null
+  leaning_count: number
+  /** A dead heat, reported as one rather than resolved into a preference. */
+  split: boolean
+}
+
+export interface OverrideLog {
+  estate_id: string
+  count: number
+  entries: OverrideEntry[]
+  patterns: CategoryPattern[]
+}
+
 export interface ResolutionDetail {
   resolution_id: string
   item_id: string

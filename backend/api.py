@@ -47,6 +47,7 @@ from dispositions import (
     record_disposition_decision,
 )
 from marketplace import MarketplaceError, get_listing, listing_id, recommend_channel
+from memories import maybe_invite_memories
 from classify import classify_bytes
 from items import (
     ItemError,
@@ -1303,6 +1304,18 @@ def post_estate_message(
     message = post_message(
         estate_id=estate_id, user_id=uid, text=text, item_id=body.item_id
     )
+
+    # Only messages a person chose to write about a particular thing. This hook
+    # sits on the endpoint rather than inside post_message on purpose: the
+    # clarification flow also writes an item-scoped message, and a reply to
+    # Steward's own question is not a memory to be admired back at. Claim
+    # comments never reach here at all — they live on the Claim, not the feed.
+    if body.item_id:
+        item = get_item(body.item_id)
+        if item is not None:
+            names = display_names_for([uid])
+            maybe_invite_memories(item, names.get(uid, "someone"), text)
+
     return _message_responses([message])[0]
 
 

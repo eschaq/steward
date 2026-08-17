@@ -13,6 +13,7 @@ import type {
   ItemListResponse,
   Me,
   MemberListResponse,
+  OverrideLog,
   Membership,
   Message,
   MessageListResponse,
@@ -251,6 +252,15 @@ export async function resolveItem(
 }
 
 /** Every item with its claim count and its decision, in one request. */
+/** What this estate has decided, and the habit Steward reads from it.
+ * Any accepted member — it is the family's own history. */
+export async function fetchOverrideLog(estateId: string): Promise<OverrideLog> {
+  const response = await authorizedFetch(
+    `/estates/${encodeURIComponent(estateId)}/override-log`,
+  )
+  return (await response.json()) as OverrideLog
+}
+
 export async function fetchReview(estateId: string): Promise<ReviewResponse> {
   const response = await authorizedFetch(`/estates/${encodeURIComponent(estateId)}/review`)
   return (await response.json()) as ReviewResponse

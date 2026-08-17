@@ -26,6 +26,7 @@ authentication, which is what Cloud Run serves.
 | `marketplace.py`     | **Tier 2** — which marketplace to sell on, and why                |
 | `mailer.py`          | The invitation email, over Gmail SMTP. Best-effort, never a gate  |
 | `clarify.py`         | Answering the agent's question, and re-reading the item with it   |
+| `memories.py`        | The third behaviour: noticing when someone has shared a memory    |
 | `notify.py`          | The two emails a family gets without opening the app              |
 | `init_firestore.py`  | Seeds one document per collection and reads it back             |
 | `seed_demo_items.py` | Demo inventory for the dashboard — **not** a test fixture       |
@@ -282,6 +283,55 @@ one.
 **firestore.rules deliberately does not allow `removed`** in its client-writable
 status list. That rule can only check membership, and removal is executor-only,
 so it has to go through this endpoint where `require_role` can see the role.
+
+### Noticing a memory
+
+The third agent behaviour. When someone writes a genuine recollection in an
+item's thread, Steward acknowledges it and asks the others — **once, ever, per
+item**.
+
+**Outside `TOOL_FOR_STATUS`, deliberately** — same reasoning as `clarify.py`.
+That table maps *status transitions* to behaviours, which is exactly what makes
+clarify and mediate reliable: the backend detects the transition, so they cannot
+be missed at the mercy of a sampling temperature. This one is triggered by what
+a person chose to write, which is not a state the backend can detect — the
+judgement *is* the model call. Forcing it into that table for symmetry would
+misrepresent how it works.
+
+**One call decides and writes**, like `recommend_channel` — the judgement and
+the sentence depend on each other, and a second call would be free to write a
+warm reply to something the first had already ruled a van booking.
+
+**Conservative by construction.** The prompt is written to refuse, and anything
+ambiguous is a refusal. Verified against real Gemini on eight cases including
+three deliberately hard ones:
+
+```
+"It struck the half hour the whole of my childhood…"        -> memory
+"Mum wound it every Sunday, standing on a chair…"           -> memory
+"I can bring the van on Saturday"                           -> quiet
+"probably worth getting valued before we decide"            -> quiet
+"Yes agreed, let's do that."                                -> quiet
+"I'd really like to have this one, it means a lot to me"    -> quiet   (wanting it is not a story)
+"It's a lovely old clock, beautiful walnut case"            -> quiet   (fondness is not a memory)
+"Thanks for sorting all this out"                           -> quiet
+```
+
+**Once per item** comes from the deterministic id `agent-memory__{item_id}` —
+checked *before* the model call, so every later message in a thread costs
+nothing. Being asked twice is what would make it read as a script.
+
+**The hook sits on the endpoint, not inside `post_message`.** The clarification
+flow also writes an item-scoped message, and a reply to Steward's own question
+is not a memory to admire back at the person. Claim comments never reach here at
+all — they live on the Claim, not the feed.
+
+**One frontend addition was needed after all.** The brief assumed none, but an
+item's thread had no compose box: a message could only acquire an `item_id` from
+Steward itself or from a clarification, so the thread was somewhere the family
+could read and not somewhere they could write. The behaviour would have been
+unreachable. `ItemDetail` now has one, under the thread rather than above it —
+you read what has been said before adding to it.
 
 ### Answering the agent's question
 

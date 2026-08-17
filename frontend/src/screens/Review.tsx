@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 
-import { ApiError, fetchMe, fetchReview, resolveItem } from '../api'
+import { ApiError, fetchMe, fetchOverrideLog, fetchReview, resolveItem } from '../api'
 import { useAuth } from '../auth'
 import { EstateNav } from '../components/EstateNav'
+import { LearnedHistory } from '../components/LearnedHistory'
 import { StatusChip } from '../components/StatusChip'
 import { estateId } from '../firebase'
 import {
@@ -14,6 +15,7 @@ import {
   type ItemStatus,
   type Me,
   type ResolutionType,
+  type OverrideLog,
   type ReviewRow,
 } from '../types'
 
@@ -40,6 +42,7 @@ export function Review() {
   const { user, leave } = useAuth()
   const [me, setMe] = useState<Me | null>(null)
   const [rows, setRows] = useState<ReviewRow[] | null>(null)
+  const [log, setLog] = useState<OverrideLog | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
@@ -49,7 +52,15 @@ export function Review() {
     try {
       const standing = await fetchMe(estateId())
       setMe(standing)
-      if (standing.role) setRows((await fetchReview(estateId())).rows)
+      if (standing.role) {
+        // The history is readable by any member; the table below is not.
+        const [review, history] = await Promise.all([
+          fetchReview(estateId()),
+          fetchOverrideLog(estateId()),
+        ])
+        setRows(review.rows)
+        setLog(history)
+      }
     } catch (error) {
       setProblem(
         error instanceof ApiError ? error.message : `Couldn't load the review: ${error}`,
@@ -128,6 +139,8 @@ export function Review() {
       )}
 
       {!loaded && <p className="notice">Gathering the estate…</p>}
+
+      {loaded && me?.role && <LearnedHistory log={log} />}
 
       {loaded && !isExecutor && (
         <div className="notice" style={{ marginTop: 18 }}>

@@ -2818,3 +2818,148 @@ h3 {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+/* --- what Steward has learned --------------------------------------------- */
+/* The adaptive loop, made visible. Sage, because this is the product being
+   settled and confident rather than asking for anything. */
+
+.learned {
+  margin-top: 26px;
+  background: var(--sage);
+  border: 1px solid var(--sage-outline);
+  border-radius: var(--r-row);
+  padding: 24px 26px 22px;
+}
+
+.learned .eyebrow {
+  display: block;
+  color: var(--on-sage-variant);
+  margin-bottom: 10px;
+}
+
+.learned__intro,
+.learned__empty {
+  margin: 0 0 18px;
+  font-size: 15.5px;
+  line-height: 1.65;
+  color: var(--on-sage-variant);
+  max-width: 62ch;
+}
+
+.learned__empty {
+  margin-bottom: 0;
+}
+
+.learned__patterns {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.learned__pattern {
+  background: var(--surface-lowest);
+  border: 1px solid var(--sage-outline);
+  border-radius: var(--r-row);
+  padding: 16px 18px;
+}
+
+/* A dead heat reads as neutral, not as a weaker version of a habit. */
+.learned__pattern--split {
+  background: var(--archive);
+  border-color: rgba(78, 70, 55, 0.16);
+}
+
+.learned__claim {
+  margin: 0 0 6px;
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--on-surface);
+}
+
+.learned__detail {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--on-surface-variant);
+}
+
+.learned__singles {
+  margin: 14px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--on-sage-variant);
+  max-width: 62ch;
+}
+
+.learned__entries {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--sage-outline);
+}
+
+.learned__summary {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--on-sage-variant);
+  cursor: pointer;
+  min-height: 24px;
+}
+
+.learned__list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.learned__entry {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 8px 0;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--on-sage);
+}
+
+.learned__entry + .learned__entry {
+  border-top: 1px solid var(--sage-outline);
+}
+
+.learned__noview {
+  color: var(--on-sage-variant);
+  opacity: 0.85;
+}
+
+.learned__entry-when {
+  flex: none;
+  font-size: 13px;
+  color: var(--on-sage-variant);
+}
+
+@media (max-width: 560px) {
+  .learned__entry {
+    flex-direction: column;
+    gap: 2px;
+  }
+}
+
+/* Saying something about one particular thing. Sits under its thread rather
+   than at the top: you read what has been said before adding to it. */
+.compose--item {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--hairline);
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-bottom: none;
+  border-radius: 0;
+  padding-left: 0;
+  padding-right: 0;
+}

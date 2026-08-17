@@ -9,6 +9,7 @@ import {
   fetchItemMessages,
   fetchMe,
   advanceDisposition,
+  postEstateMessage,
   clarifyItem,
   withdrawClaim,
   decideDisposition,
@@ -62,6 +63,8 @@ export function ItemDetail() {
   const [withdrawing, setWithdrawing] = useState(false)
   const [answering, setAnswering] = useState(false)
   const [answerOutcome, setAnswerOutcome] = useState<string | null>(null)
+  const [note, setNote] = useState('')
+  const [noting, setNoting] = useState(false)
   const [comment, setComment] = useState('')
 
   const load = useCallback(async () => {
@@ -145,6 +148,36 @@ export function ItemDetail() {
       )
     } finally {
       setDeciding(null)
+    }
+  }
+
+  /** Say something about this particular thing.
+   *
+   * Until this existed, a message could only get an `item_id` from Steward
+   * itself or from a clarification — so the item's thread was somewhere the
+   * family could read and not somewhere they could write. */
+  async function onNote(event: React.FormEvent) {
+    event.preventDefault()
+    const text = note.trim()
+    if (!text) return
+    setProblem(null)
+    setNoting(true)
+    try {
+      const posted = await postEstateMessage(estateId(), text, itemId)
+      setMessages((current) => [...(current ?? []), posted])
+      setNote('')
+      // Steward may add to the thread just after this — it reads what was
+      // written and sometimes asks the others for a memory of their own. Give
+      // that a moment, then pick it up.
+      window.setTimeout(() => {
+        void fetchItemMessages(itemId).then((thread) => setMessages(thread.messages))
+      }, 6000)
+    } catch (error) {
+      setProblem(
+        error instanceof ApiError ? error.message : `Couldn't post that: ${error}`,
+      )
+    } finally {
+      setNoting(false)
     }
   }
 
@@ -435,6 +468,28 @@ export function ItemDetail() {
           <section className="thread-section">
             <h2 className="eyebrow">About this one</h2>
             <MessageThread messages={messages ?? []} prominentId={mediationId} />
+
+            <form className="compose compose--item" onSubmit={(e) => void onNote(e)}>
+              <label className="compose__label" htmlFor="item-note">
+                Anything you remember about it, or want to say to the family.
+              </label>
+              <textarea
+                id="item-note"
+                className="compose__text"
+                rows={3}
+                placeholder="It sat on the mantel my whole childhood…"
+                value={note}
+                onChange={(event) => setNote(event.target.value)}
+                disabled={noting}
+              />
+              <button
+                className="button button--primary"
+                type="submit"
+                disabled={noting || !note.trim()}
+              >
+                {noting ? 'Posting…' : 'Add to the thread'}
+              </button>
+            </form>
           </section>
 
           {/* Last on the page on purpose. Taking something off the list is not
