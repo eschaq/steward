@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, Navigate, useParams } from 'react-router-dom'
 
 import {
   ApiError,
@@ -13,6 +13,7 @@ import { useAuth } from '../auth'
 import { EstateNav } from '../components/EstateNav'
 import { HowItsLanded } from '../components/HowItsLanded'
 import { LearnedHistory } from '../components/LearnedHistory'
+import { DEFAULT_TAB, ReviewTabs, isReviewTab, type ReviewTab } from '../components/ReviewTabs'
 import { StatusChip } from '../components/StatusChip'
 import { estateId } from '../firebase'
 import {
@@ -46,35 +47,35 @@ function titleCase(value: string): string {
  *   wants it, or what Steward suggested. Speed is the wrong thing to optimise
  *   at that moment; this table exists to clear the uncontroversial so there is
  *   time for the rest.
+ *
+ * **Three tabs, three URLs.** The two reflective panels used to sit stacked
+ * above this table. Each now has its own address, and each fetches only when
+ * somebody actually opens it — the balance in particular has to estimate values
+ * it has never seen on a first view, and making the working table wait behind
+ * that was the whole problem. Once fetched, a tab is kept: moving between them
+ * costs nothing.
  */
 export function Review() {
   const { user, leave } = useAuth()
+  const { tab: requested } = useParams()
+  const tab: ReviewTab = isReviewTab(requested) ? requested : DEFAULT_TAB
+
   const [me, setMe] = useState<Me | null>(null)
   const [rows, setRows] = useState<ReviewRow[] | null>(null)
   const [log, setLog] = useState<OverrideLog | null>(null)
   const [balance, setBalance] = useState<Balance | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
+  // Per-tab, because a failed balance must not blank the table, and a table
+  // still loading must not make the learned tab look empty.
+  const [tabProblem, setTabProblem] = useState<string | null>(null)
+  const [fetching, setFetching] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
 
   const load = useCallback(async () => {
     setProblem(null)
     try {
-      const standing = await fetchMe(estateId())
-      setMe(standing)
-      if (standing.role) {
-        // The history is readable by any member; the table below is not.
-        const [review, history] = await Promise.all([
-          fetchReview(estateId()),
-          fetchOverrideLog(estateId()),
-        ])
-        setRows(review.rows)
-        setLog(history)
-        // Deliberately not awaited with the others: a first view has to
-        // estimate values it hasn't seen, which takes a while. The table
-        // shouldn't wait behind it.
-        void fetchBalance(estateId()).then(setBalance).catch(() => undefined)
-      }
+      setMe(await fetchMe(estateId()))
     } catch (error) {
       setProblem(
         error instanceof ApiError ? error.message : `Couldn't load the review: ${error}`,
@@ -88,6 +89,51 @@ export function Review() {
     void load()
   }, [load])
 
+  const isExecutor = me?.role === 'executor'
+
+  /** Fetch whatever the open tab needs, once.
+   *
+   * Each tab is fetched the first time it is opened and then kept, so switching
+   * back and forth doesn't re-ask. A failure here is stated in the tab that
+   * asked for it rather than swallowed: a panel that renders nothing when its
+   * data never arrived is indistinguishable from a family that has decided
+   * nothing, which is the one thing it must never look like.
+   */
+  const loadTab = useCallback(async () => {
+    if (!me?.role) return
+    setTabProblem(null)
+
+    try {
+      if (tab === 'inventory') {
+        // The table is the executor's; a beneficiary is told so instead.
+        if (me.role !== 'executor' || rows !== null) return
+        setFetching(true)
+        setRows((await fetchReview(estateId())).rows)
+      } else if (tab === 'landed') {
+        if (balance !== null) return
+        setFetching(true)
+        setBalance(await fetchBalance(estateId()))
+      } else if (tab === 'learned') {
+        if (log !== null) return
+        setFetching(true)
+        setLog(await fetchOverrideLog(estateId()))
+      }
+    } catch (error) {
+      setTabProblem(
+        error instanceof ApiError ? error.message : `Couldn't load that: ${error}`,
+      )
+    } finally {
+      setFetching(false)
+    }
+    // rows/log/balance are read as "have we got this already" guards; adding
+    // them to the deps would re-run this the moment each one arrives.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me, tab])
+
+  useEffect(() => {
+    void loadTab()
+  }, [loadTab])
+
   const grouped = useMemo(() => {
     const buckets = new Map<ItemStatus, ReviewRow[]>()
     for (const status of REVIEW_ORDER) buckets.set(status, [])
@@ -99,7 +145,7 @@ export function Review() {
 
   async function assignToSoleClaimant(row: ReviewRow) {
     if (!row.sole_claimant_id) return
-    setProblem(null)
+    setTabProblem(null)
     setBusy(row.id)
     try {
       await resolveItem(row.id, {
@@ -110,8 +156,14 @@ export function Review() {
       // Refetch the whole table: resolving moves the row between groups and
       // changes the counts above it, neither of which the client should guess.
       setRows((await fetchReview(estateId())).rows)
+      // Both reflective panels are now stale — a settled item changes who has
+      // what, and recording a disposition is what the override log counts. Drop
+      // them rather than show yesterday's arithmetic; each refetches when next
+      // opened.
+      setBalance(null)
+      setLog(null)
     } catch (error) {
-      setProblem(
+      setTabProblem(
         error instanceof ApiError ? error.message : `Couldn't settle that: ${error}`,
       )
     } finally {
@@ -119,7 +171,12 @@ export function Review() {
     }
   }
 
-  const isExecutor = me?.role === 'executor'
+  // A tab that doesn't exist goes to the one that does, rather than showing the
+  // default content under a URL that misnames it. After the hooks, not before:
+  // an early return above them would change the hook order between renders.
+  if (!isReviewTab(requested)) {
+    return <Navigate to={`/review/${DEFAULT_TAB}`} replace />
+  }
 
   return (
     <main className="page">
@@ -154,161 +211,189 @@ export function Review() {
 
       {!loaded && <p className="notice">Gathering the estate…</p>}
 
-      {loaded && me?.role && <HowItsLanded balance={balance} />}
-
-      {loaded && me?.role && <LearnedHistory log={log} />}
-
-      {loaded && !isExecutor && (
-        <div className="notice" style={{ marginTop: 18 }}>
-          Only the executor works through the estate this way. Everything here is
-          on <Link to="/">the inventory</Link> too, an item at a time.
-        </div>
-      )}
-
-      {loaded && isExecutor && rows !== null && (
+      {loaded && me?.role && (
         <>
-          <p className="review__intro">
-            Everything in the estate, with what needs a decision first. Take it at
-            whatever pace suits.
-          </p>
+          <ReviewTabs active={tab} />
 
-          {grouped.map(([status, group]) => {
-            // Only a settled or routed item has anywhere to go yet, so the
-            // column appears where it means something rather than sitting empty
-            // above every other group.
-            const showsDestination = status === 'resolved' || status === 'routed'
-            return (
-            <section className="review__group" key={status}>
-              <h2 className="review__heading">
-                <StatusChip status={status} />
-                <span className="review__count">
-                  {group.length} {group.length === 1 ? 'item' : 'items'}
-                </span>
-              </h2>
+          {tabProblem && (
+            <p className="notice notice--problem" role="alert">
+              <span>{tabProblem}</span>
+              <button
+                className="button button--sage"
+                type="button"
+                onClick={() => void loadTab()}
+              >
+                Try again
+              </button>
+            </p>
+          )}
 
-              <table className="review">
-                <thead>
-                  <tr>
-                    <th scope="col">Item</th>
-                    <th scope="col">Asked for by</th>
-                    <th scope="col">Suggested</th>
-                    <th scope="col">{showsDestination ? 'Decided' : ''}</th>
-                    {showsDestination && <th scope="col">Where it goes</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {group.map((row) => (
-                    <tr key={row.id}>
-                      <th scope="row">
-                        <span className="review__item">
-                          {row.photo_url ? (
-                            <img
-                              className="review__thumb"
-                              src={row.photo_url}
-                              // Decorative: the item's name is the very next
-                              // thing in this cell, so alt text here would make
-                              // a screen reader announce it twice.
-                              alt=""
-                              loading="lazy"
-                            />
-                          ) : (
-                            <span className="review__thumb--none" aria-hidden="true" />
-                          )}
-                          <span>
-                            <Link to={`/items/${row.id}`} className="review__name">
-                              {titleCase(row.ai_category)}
-                            </Link>
-                            {row.ai_est_era_or_brand && (
-                              <span className="review__era">{row.ai_est_era_or_brand}</span>
-                            )}
-                          </span>
-                        </span>
-                      </th>
+          {/* Every tab shares one loading line, since only one is ever in
+              flight and each says the same true thing. */}
+          {fetching && <p className="notice">Gathering the estate…</p>}
 
-                      <td data-label="Asked for by">
-                        {row.claimant_count === 0 ? (
-                          <span className="review__quiet">Nobody yet</span>
-                        ) : row.sole_claimant_name ? (
-                          row.sole_claimant_name
-                        ) : (
-                          `${row.claimant_count} people`
-                        )}
-                      </td>
+          {tab === 'landed' && !fetching && <HowItsLanded balance={balance} />}
 
-                      <td data-label="Suggested">
-                        {row.suggested_disposition === 'uncertain' ? (
-                          <span className="review__quiet">No suggestion yet</span>
-                        ) : (
-                          titleCase(row.suggested_disposition)
-                        )}
-                        <span className="review__confidence">
-                          {Math.round(row.ai_classification_confidence * 100)}% sure
-                        </span>
-                      </td>
+          {tab === 'learned' && !fetching && <LearnedHistory log={log} />}
 
-                      <td
-                        className="review__action"
-                        data-label={showsDestination ? 'Decided' : undefined}
-                      >
-                        {row.decided_type && (
-                          <span className="review__decided">
-                            {RESOLUTION_LABEL[row.decided_type as ResolutionType] ??
-                              row.decided_type}
-                            {row.decided_to_name ? ` — ${row.decided_to_name}` : ''}
-                          </span>
-                        )}
+          {tab === 'inventory' && !isExecutor && (
+            <div className="notice" style={{ marginTop: 18 }}>
+              Only the executor works through the estate this way. Everything here
+              is on <Link to="/">the inventory</Link> too, an item at a time.
+            </div>
+          )}
 
-                        {/* One name on it: settle from here. */}
-                        {row.status === 'claimed' && row.sole_claimant_id && (
-                          <button
-                            className="button button--sage"
-                            type="button"
-                            disabled={busy === row.id}
-                            onClick={() => void assignToSoleClaimant(row)}
-                          >
-                            {busy === row.id
-                              ? 'Settling…'
-                              : `It goes to ${row.sole_claimant_name}`}
-                          </button>
-                        )}
+          {tab === 'inventory' && isExecutor && rows !== null && (
+            <>
+              <p className="review__intro">
+                Everything in the estate, with what needs a decision first. Take it
+                at whatever pace suits.
+              </p>
 
-                        {/* More than one name: read it properly first. */}
-                        {row.status === 'contested' && (
-                          <Link className="button button--sage" to={`/items/${row.id}/resolve`}>
-                            Talk it through →
-                          </Link>
-                        )}
+              {grouped.map(([status, group]) => {
+                // Only a settled or routed item has anywhere to go yet, so the
+                // column appears where it means something rather than sitting
+                // empty above every other group.
+                const showsDestination = status === 'resolved' || status === 'routed'
+                return (
+                <section className="review__group" key={status}>
+                  <h2 className="review__heading">
+                    <StatusChip status={status} />
+                    <span className="review__count">
+                      {group.length} {group.length === 1 ? 'item' : 'items'}
+                    </span>
+                  </h2>
 
-                        {row.status === 'needs_clarification' && (
-                          <Link className="review__link" to={`/items/${row.id}`}>
-                            Steward asked something →
-                          </Link>
-                        )}
-                      </td>
-
-                      {showsDestination && (
-                        <td data-label="Where it goes">
-                          {row.disposition ? (
-                            <span className="review__destination">
-                              {whereItGoes(row.disposition)}
+                  <table className="review">
+                    <thead>
+                      <tr>
+                        <th scope="col">Item</th>
+                        <th scope="col">Asked for by</th>
+                        <th scope="col">Suggested</th>
+                        <th scope="col">{showsDestination ? 'Decided' : ''}</th>
+                        {showsDestination && <th scope="col">Where it goes</th>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {group.map((row) => (
+                        <tr key={row.id}>
+                          <th scope="row">
+                            <span className="review__item">
+                              {row.photo_url ? (
+                                <img
+                                  className="review__thumb"
+                                  src={row.photo_url}
+                                  // Decorative: the item's name is the very next
+                                  // thing in this cell, so alt text here would
+                                  // make a screen reader announce it twice.
+                                  alt=""
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <span className="review__thumb--none" aria-hidden="true" />
+                              )}
+                              <span>
+                                <Link to={`/items/${row.id}`} className="review__name">
+                                  {titleCase(row.ai_category)}
+                                </Link>
+                                {row.ai_est_era_or_brand && (
+                                  <span className="review__era">
+                                    {row.ai_est_era_or_brand}
+                                  </span>
+                                )}
+                              </span>
                             </span>
-                          ) : (
-                            /* Not an empty cell: settled and undecided is the
-                               one place left where this table has something to
-                               ask of the executor. */
-                            <Link className="review__link" to={`/items/${row.id}`}>
-                              Where does it go? →
-                            </Link>
+                          </th>
+
+                          <td data-label="Asked for by">
+                            {row.claimant_count === 0 ? (
+                              <span className="review__quiet">Nobody yet</span>
+                            ) : row.sole_claimant_name ? (
+                              row.sole_claimant_name
+                            ) : (
+                              `${row.claimant_count} people`
+                            )}
+                          </td>
+
+                          <td data-label="Suggested">
+                            {row.suggested_disposition === 'uncertain' ? (
+                              <span className="review__quiet">No suggestion yet</span>
+                            ) : (
+                              titleCase(row.suggested_disposition)
+                            )}
+                            <span className="review__confidence">
+                              {Math.round(row.ai_classification_confidence * 100)}% sure
+                            </span>
+                          </td>
+
+                          <td
+                            className="review__action"
+                            data-label={showsDestination ? 'Decided' : undefined}
+                          >
+                            {row.decided_type && (
+                              <span className="review__decided">
+                                {RESOLUTION_LABEL[row.decided_type as ResolutionType] ??
+                                  row.decided_type}
+                                {row.decided_to_name ? ` — ${row.decided_to_name}` : ''}
+                              </span>
+                            )}
+
+                            {/* One name on it: settle from here. */}
+                            {row.status === 'claimed' && row.sole_claimant_id && (
+                              <button
+                                className="button button--sage"
+                                type="button"
+                                disabled={busy === row.id}
+                                onClick={() => void assignToSoleClaimant(row)}
+                              >
+                                {busy === row.id
+                                  ? 'Settling…'
+                                  : `It goes to ${row.sole_claimant_name}`}
+                              </button>
+                            )}
+
+                            {/* More than one name: read it properly first. */}
+                            {row.status === 'contested' && (
+                              <Link
+                                className="button button--sage"
+                                to={`/items/${row.id}/resolve`}
+                              >
+                                Talk it through →
+                              </Link>
+                            )}
+
+                            {row.status === 'needs_clarification' && (
+                              <Link className="review__link" to={`/items/${row.id}`}>
+                                Steward asked something →
+                              </Link>
+                            )}
+                          </td>
+
+                          {showsDestination && (
+                            <td data-label="Where it goes">
+                              {row.disposition ? (
+                                <span className="review__destination">
+                                  {whereItGoes(row.disposition)}
+                                </span>
+                              ) : (
+                                /* Not an empty cell: settled and undecided is
+                                   the one place left where this table has
+                                   something to ask of the executor. */
+                                <Link className="review__link" to={`/items/${row.id}`}>
+                                  Where does it go? →
+                                </Link>
+                              )}
+                            </td>
                           )}
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
-            )
-          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </section>
+                )
+              })}
+            </>
+          )}
         </>
       )}
     </main>

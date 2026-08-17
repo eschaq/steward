@@ -1535,6 +1535,48 @@ h3 {
   color: var(--on-sage-variant);
 }
 
+/* --- review subtabs --------------------------------------------------------
+   The same idiom as the app bar — a rule under where you are, never a filled
+   chip — moved onto cream. Chips in this system are archival tags on objects
+   and pills are actions; a section marker is neither, so it borrows the one
+   treatment already established for "you are here". Clay rather than the ink
+   accent, because on cream the accent has nothing to lift off.
+
+   A hairline runs the full width beneath the strip so the tabs read as the top
+   edge of the panel below them rather than as three loose links. */
+.subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 26px;
+  row-gap: 4px;
+  margin: 26px 0 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.subtab {
+  font-family: var(--serif);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--on-surface-variant);
+  text-decoration: none;
+  /* Sits on the rule: the 2px marker replaces the hairline under the current
+     tab rather than stacking below it. */
+  padding: 4px 0 9px;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  transition: color 150ms ease, border-color 150ms ease;
+}
+
+.subtab:hover {
+  color: var(--on-surface);
+}
+
+.subtab[aria-current='page'] {
+  color: var(--on-surface);
+  border-bottom-color: var(--primary);
+}
+
 /* --- the executor's review table ------------------------------------------ */
 
 .review__intro {
@@ -2617,6 +2659,19 @@ h3 {
   }
   .estate-nav__link {
     font-size: 16px;
+  }
+  /* Two of the three labels are a phrase, not a word, so on a phone the strip
+     becomes a stack of full-width rows rather than three ragged wraps. The rule
+     under the current one still marks it. */
+  .subtabs {
+    gap: 0;
+    row-gap: 0;
+  }
+  .subtab {
+    flex: 1 0 100%;
+    font-size: 16px;
+    padding: 10px 0;
+    border-bottom: 2px solid transparent;
   }
 }
 

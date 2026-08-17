@@ -124,7 +124,10 @@ function Routed() {
       <Route path="/items/:itemId" element={<ItemDetail />} />
       <Route path="/items/:itemId/resolve" element={<ResolveItem />} />
       <Route path="/messages" element={<MessageCenter />} />
-      <Route path="/review" element={<Review />} />
+      {/* Review is three addressable sections, not one long scroll. The bare
+          path lands on the working table, which is what people come for. */}
+      <Route path="/review" element={<Navigate to="/review/inventory" replace />} />
+      <Route path="/review/:tab" element={<Review />} />
       <Route path="/family" element={<Family />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

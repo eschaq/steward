@@ -72,7 +72,10 @@ the final call is theirs to record and that Steward suggests but doesn't decide.
 | `/items/:itemId`  | Item detail    | Placard, who's asked and why, the item's message thread, and the claim action. |
 | `/messages`       | Message Center | The estate-wide unified feed, and composing to it. |
 | `/items/:itemId/resolve` | Contested resolution | Executor-only: record how a claimed or contested item was settled. |
-| `/review`         | Review table   | Executor-only: every item on one page, grouped by what needs deciding. |
+| `/review`         | Review         | Three subtabs; the bare path redirects to the first. |
+| `/review/inventory` | Review table | Executor-only: every item on one page, grouped by what needs deciding. A beneficiary is told plainly that this is the executor's work. |
+| `/review/landed`  | How things have landed | Any member: roughly what has gone to whom. |
+| `/review/learned` | What Steward has learned | Any member: the estate's decisions and the habit read from them. |
 | `/family`         | Family         | Who's here and who's still waiting; the executor can ask someone new in. |
 
 All six are wired to the real backend against real Firestore. There is no mock
