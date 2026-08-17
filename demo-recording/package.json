@@ -1,0 +1,14 @@
+{
+  "name": "steward-demo-recording",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Screen-recording harness for demo footage. Not part of the app — see README.",
+  "scripts": {
+    "smoke": "node record-smoke.mjs",
+    "install-browser": "playwright install chromium"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.1"
+  }
+}
