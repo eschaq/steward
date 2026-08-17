@@ -341,6 +341,60 @@ The follow-up is deliberately **not** idempotent-once, unlike the opening
 question: a family can answer more than once and each answer earns its own
 reply.
 
+### Firestore Security Rules — live
+
+Deployed 2026-08-17. **Nothing had ever been deployed before that**: the
+`firebaserules` releases API returned `{}` for this project, so production had
+been running on whatever default the database was created with while the rules
+file was only ever exercised against the emulator.
+
+The live ruleset is byte-identical to `firestore.rules` (sha256 verified), has
+explicit rules for all 10 collections and a default-deny catch-all, and contains
+no permissive `allow read, write: if true`.
+
+**Verified against production, not inferred from the emulator.** Two layers,
+and only one of them is governed by these rules:
+
+```
+LAYER 1 — through the deployed backend (Admin SDK; rules do NOT apply)
+  own estate's items      ALLOWED       require_role
+  another estate's items  BLOCKED 403
+  another estate's item   BLOCKED 403
+
+LAYER 2 — direct to production Firestore with the same user's ID token
+  own estate's item       ALLOWED       <- these rules
+  another estate's item   BLOCKED 403 PERMISSION_DENIED
+  another person's user   BLOCKED 403 PERMISSION_DENIED
+  own user document       ALLOWED
+  no token at all         BLOCKED 403 PERMISSION_DENIED
+```
+
+**The direct test found a real hole, which is the reason it was worth running.**
+The item `status` rule checked membership only:
+
+```
+allow update: if isMember(...) && changedKeys().hasOnly(['status'])
+              && request.resource.data.status in [... 'resolved', 'routed' ...]
+```
+
+so any beneficiary could `PATCH` `status: "resolved"` straight into Firestore and
+forge a settlement that `resolve_item()` would have refused them. Emulator-green
+and production-wrong: the suite had a case for routing via *dispositions* but
+none for writing the status field directly.
+
+The rule is now split by role — members may move an item within the claim triad
+(`unclaimed`/`claimed`/`contested`/`needs_clarification`, all derived from claims
+they can already write), and only an executor may write `resolved` or `routed`.
+`removed` is in neither list and must go through the API. Four new test cases
+cover it, and the fix is confirmed against production:
+
+```
+beneficiary writes status=resolved  BLOCKED 403
+beneficiary writes status=routed    BLOCKED 403
+beneficiary writes status=removed   BLOCKED 403
+beneficiary writes status=claimed   ALLOWED (correct)
+```
+
 ### Deployed
 
 **https://steward-backend-223877730603.us-central1.run.app** — us-central1,
