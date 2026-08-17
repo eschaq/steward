@@ -25,9 +25,29 @@ import type {
 } from './types'
 
 export class ApiError extends Error {
-  constructor(readonly status: number, message: string) {
+  constructor(
+    readonly status: number,
+    message: string,
+    /** Structured `detail` when the server sent an object rather than a string
+     * — the photo pre-check uses this to hand the UI a concern it can act on. */
+    readonly detail?: unknown,
+  ) {
     super(message)
   }
+}
+
+/** The photo pre-check's verdict, when an upload came back 422 because the
+ * picture looked unusable. */
+export interface PhotoConcern {
+  kind: 'photo_concern'
+  problem: string
+  message: string
+}
+
+export function photoConcern(error: unknown): PhotoConcern | null {
+  if (!(error instanceof ApiError) || error.status !== 422) return null
+  const d = error.detail as PhotoConcern | undefined
+  return d && d.kind === 'photo_concern' ? d : null
 }
 
 async function authorizedFetch(
@@ -74,7 +94,14 @@ async function authorizedFetch(
       .json()
       .then((body) => body?.detail)
       .catch(() => null)
-    throw new ApiError(response.status, detail ?? `Request failed (${response.status}).`)
+    // FastAPI's `detail` is a string for most errors and an object for the
+    // photo pre-check; keep both rather than stringifying the useful one.
+    const text =
+      typeof detail === 'string'
+        ? detail
+        : (detail as { message?: string })?.message ??
+          `Request failed (${response.status}).`
+    throw new ApiError(response.status, text, detail)
   }
 
   return response
@@ -208,11 +235,15 @@ export async function fetchReview(estateId: string): Promise<ReviewResponse> {
  *
  * Slow on purpose: a real Gemini call sits inside it. The caller has to say so
  * rather than leave the executor watching nothing happen. */
-export async function addEstateItem(estateId: string, file: File): Promise<Item> {
+export async function addEstateItem(
+  estateId: string,
+  file: File,
+  acceptAnyway = false,
+): Promise<Item> {
   const form = new FormData()
   form.append('file', file)
   const response = await authorizedFetch(
-    `/estates/${encodeURIComponent(estateId)}/items`,
+    `/estates/${encodeURIComponent(estateId)}/items${acceptAnyway ? '?accept_anyway=true' : ''}`,
     { method: 'POST', form },
   )
   return (await response.json()) as Item

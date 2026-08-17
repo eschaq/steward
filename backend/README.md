@@ -341,6 +341,57 @@ The follow-up is deliberately **not** idempotent-once, unlike the opening
 question: a family can answer more than once and each answer earns its own
 reply.
 
+### The photo pre-check
+
+Both upload paths run `photo_quality.inspect()` before anything is stored or
+classified. A hopeless frame comes back **422** with a structured concern and no
+Gemini call is made; `?accept_anyway=true` skips the check entirely, because a
+convenience layer that can trap someone holding a good photograph is worse than
+no layer.
+
+**It is not Gemma, which is what was asked for.** Both routes were checked on
+2026-08-17. Gemma is in Vertex Model Garden as an open model (`gemma3`,
+`gemma3n`, `shieldgemma2`) and every one reports
+`supportedActions: [openNotebook, deploy, deployGke, multiDeployVertex]` —
+deploy-only, no serverless `predict`. Running one needs a `g2-standard-12` /
+NVIDIA L4 endpoint that bills continuously whether or not anyone uploads, needs
+GPU quota, and adds cold-start latency to the thing it is meant to speed up.
+The Gemini API route would work but needs the AI Studio key CLAUDE.md records as
+removed. This project has no deployed endpoints. So the check is arithmetic —
+Pillow, no new dependency, no network, **4–20 ms**.
+
+**The thresholds were calibrated against the classifier, not by eye**, and that
+changed the design. Degrading a real photograph of a real armchair and asking
+gemini-3.5-flash what it made of each version:
+
+```
+brightness 202 (clean)    -> 'armchair' 0.95
+brightness  63 (very dark)-> 'armchair' 0.95     still fine
+sharpness  2543 (clean)   -> 'armchair' 0.95
+sharpness   2.9 (blur 12) -> 'armchair' 0.85     still fine
+sharpness   2.4 (blur 30) -> 'unknown'  0.10     finally breaks
+contrast    0.0 (blank)   -> 'unknown'  0.00     reliably broken
+```
+
+Gemini is far more tolerant than it looks. A sensible-looking blur threshold in
+the tens would have interrupted people holding photographs the classifier reads
+perfectly. Every threshold therefore sits at the point of *demonstrated*
+failure: `TOO_DARK 25`, `TOO_BRIGHT 244`, `TOO_BLURRY 2.6`, `TOO_FLAT 3.0`.
+
+**The consequence is worth stating: this catches much less than a photo-quality
+check normally would.** Only frames with no recoverable detail. That is the
+correct amount for this pipeline, and it is the finding rather than a
+compromise.
+
+A first calibration attempt used the gable photograph as its base and produced
+nonsense — Gemini returns `unknown` for it regardless of quality, because it is
+architecture rather than a household object. The control has to be something
+the classifier can read when it is clean.
+
+Verified in the browser: a blur-sigma-30 frame is flagged in **223 ms** round
+trip with no Gemini call; "Use it anyway" pushes it through; a clear photograph
+goes straight to classification in 4.7 s with no interruption.
+
 ### Cataloguing a belonging
 
 `POST /estates/{id}/items` is the entry point of the whole thing: one photograph

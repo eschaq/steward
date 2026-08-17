@@ -63,6 +63,7 @@ from messages import (
     get_messages_for_item,
     post_message,
 )
+from photo_quality import inspect as inspect_photo, should_offer_retake
 from photos import MAX_BYTES, PhotoError, store_item_photo
 from membership import (
     MembershipError,
@@ -1157,6 +1158,52 @@ def post_claim(item_id: str, body: ClaimRequest, uid: CallerUid) -> ClaimRespons
     )
 
 
+class PhotoConcern(BaseModel):
+    """Why a photograph looked unusable, and what to say about it."""
+
+    problem: str
+    message: str
+    brightness: Optional[float] = None
+    sharpness: Optional[float] = None
+    contrast: Optional[float] = None
+    took_ms: Optional[float] = None
+
+
+def _photo_concern(data: bytes, accept_anyway: bool) -> None:
+    """Look at a photograph before spending a Gemini call on it.
+
+    Shared by both upload paths, so the judgement and the wording exist once.
+
+    Raises 422 with the concern attached when the picture looks hopeless and
+    the caller has not already said "use it anyway". Nothing is stored and no
+    classification runs, so a retake costs the person a moment rather than a
+    round trip through the model.
+
+    `accept_anyway` is the whole reason this is a 422 and not a refusal: the
+    check is a convenience, and someone who knows their photograph is fine must
+    be able to say so and be believed.
+    """
+    if accept_anyway:
+        return
+    verdict = inspect_photo(data)
+    if not should_offer_retake(verdict):
+        return
+    raise HTTPException(
+        status_code=422,
+        detail={
+            "kind": "photo_concern",
+            **PhotoConcern(
+                problem=verdict.problem or "unclear",
+                message=verdict.message or "That photo may not be usable.",
+                brightness=verdict.brightness,
+                sharpness=verdict.sharpness,
+                contrast=verdict.contrast,
+                took_ms=verdict.took_ms,
+            ).model_dump(),
+        },
+    )
+
+
 class ClarifyRequest(BaseModel):
     text: str
 
@@ -1256,7 +1303,10 @@ def delete_item_claim(item_id: str, uid: CallerUid) -> WithdrawResponse:
 
 @app.post("/items/{item_id}/photo", response_model=ItemSummary)
 async def post_item_photo(
-    item_id: str, uid: CallerUid, file: UploadFile = File(...)
+    item_id: str,
+    uid: CallerUid,
+    file: UploadFile = File(...),
+    accept_anyway: bool = False,
 ) -> ItemSummary:
     """Attach a photograph to an item. Executor only.
 
@@ -1279,6 +1329,8 @@ async def post_item_photo(
             detail=f"That photo is larger than {MAX_BYTES // 1024 // 1024}MB.",
         )
 
+    _photo_concern(data, accept_anyway)
+
     try:
         url = store_item_photo(item_id, data, file.content_type)
     except PhotoError as exc:
@@ -1289,7 +1341,10 @@ async def post_item_photo(
 
 @app.post("/estates/{estate_id}/items", response_model=ItemSummary, status_code=201)
 async def post_estate_item(
-    estate_id: str, uid: CallerUid, file: UploadFile = File(...)
+    estate_id: str,
+    uid: CallerUid,
+    file: UploadFile = File(...),
+    accept_anyway: bool = False,
 ) -> ItemSummary:
     """Catalogue a new belonging from a photograph. Executor only.
 
@@ -1322,6 +1377,9 @@ async def post_estate_item(
             status_code=413,
             detail=f"That photo is larger than {MAX_BYTES // 1024 // 1024}MB.",
         )
+
+    # Before anything is stored or classified: is this picture worth the call?
+    _photo_concern(data, accept_anyway)
 
     # The id is reserved first so the photograph can be filed under the item it
     # belongs to, before that item exists.

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 
-import { ApiError, addEstateItem } from '../api'
+import { ApiError, addEstateItem, photoConcern } from '../api'
 import { ESTATE_ID } from '../firebase'
 import type { Item } from '../types'
 
@@ -18,6 +18,9 @@ export function AddItem({ onAdded }: { onAdded: (item: Item) => void }) {
   const input = useRef<HTMLInputElement>(null)
   const [stage, setStage] = useState<'idle' | 'uploading' | 'reading'>('idle')
   const [problem, setProblem] = useState<string | null>(null)
+  // A photograph the pre-check thought was unusable, held back with the file so
+  // the person can look at the message and decide.
+  const [concern, setConcern] = useState<{ file: File; message: string } | null>(null)
 
   const working = stage !== 'idle'
 
@@ -27,19 +30,28 @@ export function AddItem({ onAdded }: { onAdded: (item: Item) => void }) {
     // fires no change event and the second upload silently never happens.
     event.target.value = ''
     if (!file) return
+    await send(file, false)
+  }
 
+  async function send(file: File, acceptAnyway: boolean) {
     setProblem(null)
+    setConcern(null)
     setStage('uploading')
     // The two halves of the wait are worth naming separately — the second one
     // is where the time actually goes, and "Steward is looking at it" is a
     // truer account of the pause than "Loading…".
     const reading = window.setTimeout(() => setStage('reading'), 1200)
     try {
-      onAdded(await addEstateItem(ESTATE_ID, file))
+      onAdded(await addEstateItem(ESTATE_ID, file, acceptAnyway))
     } catch (error) {
-      setProblem(
-        error instanceof ApiError ? error.message : `Couldn't add that one: ${error}`,
-      )
+      // The pre-check's verdict is an offer, not a refusal: hold the file and
+      // let them look at the picture again, or overrule it.
+      const flagged = photoConcern(error)
+      if (flagged) setConcern({ file, message: flagged.message })
+      else
+        setProblem(
+          error instanceof ApiError ? error.message : `Couldn't add that one: ${error}`,
+        )
     } finally {
       window.clearTimeout(reading)
       setStage('idle')
@@ -76,6 +88,33 @@ export function AddItem({ onAdded }: { onAdded: (item: Item) => void }) {
           This takes a few seconds — Steward reads the photograph and works out
           what the thing is. No need to wait on it if you'd rather carry on.
         </p>
+      )}
+
+      {concern && (
+        <div className="add-item__concern" role="status">
+          <p className="add-item__concern-text">{concern.message}</p>
+          <div className="add-item__concern-actions">
+            <button
+              className="button button--sage"
+              type="button"
+              disabled={working}
+              onClick={() => input.current?.click()}
+            >
+              Pick another
+            </button>
+            {/* Believed, not argued with. The check is a convenience and it can
+                be wrong; someone who knows their photograph is fine says so
+                once and it goes through. */}
+            <button
+              className="button button--quiet"
+              type="button"
+              disabled={working}
+              onClick={() => void send(concern.file, true)}
+            >
+              Use it anyway
+            </button>
+          </div>
+        </div>
       )}
 
       {problem && (

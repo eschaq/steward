@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 
 import { readableAuthError, useAuth } from '../auth'
 import { StewardLockup } from '../components/StewardMark'
@@ -20,6 +20,48 @@ export function SignIn() {
   const [problem, setProblem] = useState<string | null>(null)
   const [working, setWorking] = useState(false)
   const [sent, setSent] = useState<string | null>(null)
+  const hero = useRef<HTMLVideoElement>(null)
+
+  /* Autoplay, made to actually happen.
+   *
+   * React applies `muted` as a DOM *property*, and never writes the attribute.
+   * Chrome decides whether a video may autoplay by reading the **attribute** as
+   * the element is parsed — so `<video muted autoPlay>` written in JSX arrives
+   * at the browser looking unmuted, and gets blocked. It loads, paints its
+   * poster, and sits there. (Headless Chromium is more permissive, which is
+   * exactly why this got past the first round of verification.)
+   *
+   * So: set the attribute ourselves, then ask it to play. If the browser still
+   * refuses — a data saver, battery saver, a policy we can't see — the poster
+   * and the background photograph are already the right picture, and one retry
+   * on the first interaction costs nothing.
+   */
+  useEffect(() => {
+    const video = hero.current
+    if (!video) return
+
+    video.muted = true
+    video.defaultMuted = true
+    video.setAttribute('muted', '')
+
+    let cancelled = false
+    const start = () => {
+      if (cancelled) return
+      const attempt = video.play()
+      if (attempt) attempt.catch(() => undefined)
+    }
+    start()
+
+    // Some browsers only relax the policy once the page has been touched.
+    const onInteract = () => start()
+    window.addEventListener('pointerdown', onInteract, { once: true })
+    window.addEventListener('keydown', onInteract, { once: true })
+    return () => {
+      cancelled = true
+      window.removeEventListener('pointerdown', onInteract)
+      window.removeEventListener('keydown', onInteract)
+    }
+  }, [])
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
@@ -64,6 +106,30 @@ export function SignIn() {
   return (
     <div className="signin">
       <div className="signin__photo" aria-hidden="true">
+        {/* `?v=` is a cache-buster, and it earns its keep: this file was
+            replaced in place once already and browsers hold on to media hard —
+            a range-requested video survives an ordinary hard refresh. Bump the
+            token whenever the clip is regenerated or re-cut.
+
+            The poster and the div's background-image are both frames from
+            *this* clip, not the older gable stills — otherwise a failed video
+            would fall back to a different building. If the
+            video never loads — decode failure, a browser that blocks autoplay,
+            a stripped-down data saver — the photograph is already there and
+            nothing about the layout changes. `poster` is that same still, so
+            the first painted frame matches either way. */}
+        <video
+          ref={hero}
+          className="signin__video"
+          src="/brand/hero-drift-loop.mp4?v=3"
+          poster="/brand/hero-drift-poster.jpg"
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="auto"
+          tabIndex={-1}
+        />
         <div className="signin__duotone" />
         <div className="signin__scrim" />
       </div>
