@@ -1,0 +1,13 @@
+# Never in the image. Secrets come from Secret Manager at runtime.
+.env
+.env.*
+
+# Local dev only.
+.venv/
+__pycache__/
+*.pyc
+test_*.py
+test_data/
+seed_demo_items.py
+init_firestore.py
+dev_tokens.py

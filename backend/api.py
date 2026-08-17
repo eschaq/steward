@@ -471,6 +471,14 @@ class AgentMessageResponse(BaseModel):
 # --- health -----------------------------------------------------------------
 
 
+# Two paths, one check. Google's frontend intercepts `/healthz` on Cloud Run
+# and answers it with its own 404 before the request reaches the container —
+# verified: the route is present in the deployed OpenAPI spec, `/healthz/`
+# returns the app's own 307 redirect, and `/healthz` returns a GFE error page
+# with no `server: Google Frontend` header. `/health` is not reserved, so that
+# is the one to probe in production; `/healthz` stays for local and for any
+# Kubernetes-shaped deployment, where it is the convention.
+@app.get("/health")
 @app.get("/healthz")
 def healthz() -> dict[str, str]:
     """Liveness check for Cloud Run. The only unauthenticated route."""

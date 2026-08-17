@@ -341,6 +341,62 @@ The follow-up is deliberately **not** idempotent-once, unlike the opening
 question: a family can answer more than once and each answer earns its own
 reply.
 
+### Deployed
+
+**https://steward-backend-223877730603.us-central1.run.app** — us-central1,
+revision `steward-backend-00002-2x8`.
+
+```
+min instances  0        scales to zero when idle
+max instances  5        the spend ceiling
+concurrency    40       requests per instance
+cpu / memory   1 / 1Gi
+timeout        300s     a Veo-free path, but Gemini + Storage can take ~8s
+service acct   223877730603-compute@developer.gserviceaccount.com
+```
+
+**Why max 5.** Every expensive path here is executor-driven and one-at-a-time —
+a photograph, a resolution, a listing. Five instances at 40 concurrent requests
+is 200 in flight, far beyond what a handful of families generate, while capping
+what a runaway loop can spend. Scaling to zero means an idle service costs
+nothing between build sessions, which is the hackathon's own guidance.
+
+Secrets come from **Secret Manager** at runtime, never from the image:
+`GMAIL_ADDRESS` and `GMAIL_APP_PASSWORD` are mounted as `valueFrom.secretKeyRef`
+and `.dockerignore` excludes `.env` outright. The app password is stored
+de-spaced, as `mailer.credentials()` expects.
+
+**`/healthz` does not work on Cloud Run, and `/health` does.** Google's frontend
+intercepts `/healthz` and answers with its own 404 before the request reaches
+the container — verified rather than guessed: the route *is* present in the
+deployed OpenAPI spec, `/healthz/` returns the app's own 307 redirect, and
+`/healthz` returns a GFE error page with no `server: Google Frontend` header.
+Both paths are registered; probe `/health` in production.
+
+**The service identity was checked explicitly**, because everything until now
+ran on personal ADC. The default compute service account holds `roles/editor`,
+which covers Firestore, Storage and Vertex; `roles/secretmanager.secretAccessor`
+was granted per-secret. `cloudbuild`, `secretmanager` and `identitytoolkit` APIs
+had to be enabled — none had been needed before. Verified against the live URL:
+
+```
+/health                              200
+unauthenticated read                 401
+GET /estates/{id}/items              200, 49 items      Firestore
+GET /estates/{id}/review             200, 49 rows       multi-collection join
+GET /estates/{id}/members            200, 15 members    Firebase Auth + users
+stored photo URL                     200                Cloud Storage
+POST /estates/{id}/items (a photo)   'armchair' 0.98    Vertex AI + Storage write
+```
+
+The last one is the real proof: 7.8s round trip covering a Cloud Storage write,
+a live Gemini classification and a Firestore write, all on the service's own
+identity with no local credentials involved.
+
+**Still to do before the frontend lands:** `STEWARD_ALLOWED_ORIGINS` is
+`http://localhost:5173` and must gain the deployed frontend's origin, and
+`STEWARD_APP_URL` is unset so invitation emails carry no continue link.
+
 ### The photo pre-check
 
 Both upload paths run `photo_quality.inspect()` before anything is stored or
