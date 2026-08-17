@@ -26,6 +26,11 @@ from resolutions import ResolutionError, get_resolution, resolution_id, resolve_
 from test_claims import BENEFICIARIES, ESTATE_ID, ITEM_B_ID, reset_item
 from test_messages import clear_messages
 
+
+from test_guard import require_destructive_ok
+
+require_destructive_ok(__name__, "test_resolutions.py", "test-resolve-unclaimed and the claim fixtures it shares")
+
 EXECUTOR = ("steward-test-executor@example.com", "Test Executor")
 
 # A fresh item nobody claims, for case (c).

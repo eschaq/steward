@@ -48,6 +48,11 @@ from resolutions import resolve_item
 from test_claims import BENEFICIARIES, ESTATE_ID, reset_item
 from test_resolutions import EXECUTOR, clear_resolution
 
+
+from test_guard import require_destructive_ok
+
+require_destructive_ok(__name__, "test_overrides.py", "the test-override-* items and this estate's override log")
+
 SAMPLE_IMAGE = Path(__file__).parent / "test_data" / "sample_item.png"
 
 # Four items that build the estate's habit, and two that test against it.

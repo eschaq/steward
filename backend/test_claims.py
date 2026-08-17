@@ -30,6 +30,11 @@ from init_firestore import to_firestore
 from membership import accept_invite, create_auth_user, invite_to_estate
 from models import Claim, Item, ItemStatus, MembershipRole, SuggestedDisposition
 
+
+from test_guard import require_destructive_ok
+
+require_destructive_ok(__name__, "test_claims.py", "test-claim-item-a and -b, and every claim on them")
+
 ESTATE_ID = "seed-estate-001"
 
 ITEM_A_ID = "test-claim-item-a"

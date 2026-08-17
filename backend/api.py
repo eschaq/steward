@@ -24,6 +24,7 @@ from typing import Optional
 
 import logging
 import os
+from collections import Counter, defaultdict
 
 from firebase_admin import auth
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -63,6 +64,7 @@ from messages import (
     get_messages_for_item,
     post_message,
 )
+from overrides import get_override_history
 from photo_quality import inspect as inspect_photo, should_offer_retake
 from photos import MAX_BYTES, PhotoError, store_item_photo
 from membership import (
@@ -959,6 +961,107 @@ def get_estate_members(estate_id: str, uid: CallerUid) -> MemberListResponse:
         count=len(members),
         pending_count=sum(1 for m in members if not m.accepted),
         members=members,
+    )
+
+
+class OverrideEntry(BaseModel):
+    item_id: str
+    item_category: str
+    ai_suggested_disposition: str
+    executor_chosen_disposition: str
+    created_at: datetime
+    # Whether Steward had actually formed a view at the time. Every early entry
+    # is `uncertain`, which is the honest state of an estate with no history —
+    # the UI must not render that as "Steward suggested uncertain".
+    steward_had_a_view: bool
+    agreed: bool
+
+
+class CategoryPattern(BaseModel):
+    """What this estate has done with one kind of thing, so far.
+
+    The same arithmetic `overrides.suggest_disposition()` runs — deliberately,
+    so what the family reads here and what the agent says on an item can never
+    tell two different stories.
+    """
+
+    category: str
+    total: int
+    counts: dict[str, int]
+    # The leading choice, or null when the estate is genuinely split.
+    leaning: Optional[str] = None
+    leaning_count: int = 0
+    # A dead heat is not a pattern. Named so the UI can say so out loud.
+    split: bool = False
+
+
+class OverrideLogResponse(BaseModel):
+    estate_id: str
+    count: int
+    entries: list[OverrideEntry]
+    patterns: list[CategoryPattern]
+
+
+@app.get("/estates/{estate_id}/override-log", response_model=OverrideLogResponse)
+def get_estate_override_log(estate_id: str, uid: CallerUid) -> OverrideLogResponse:
+    """What this estate has decided, and the habit the agent reads from it.
+
+    Any accepted member: this is the family's own decision history, the same
+    access level as claims and messages. It is also the only place the adaptive
+    loop is visible — until now the agent cited a pattern nobody could inspect.
+
+    Returns both the raw entries, oldest first, and the per-category tally the
+    suggestion is actually derived from.
+    """
+    try:
+        require_role(uid, estate_id)
+    except MembershipError as exc:
+        raise _forbidden(exc) from exc
+
+    entries = sorted(
+        get_override_history(estate_id), key=lambda e: e.created_at
+    )
+
+    by_category: dict[str, Counter] = defaultdict(Counter)
+    for e in entries:
+        by_category[e.item_category][e.executor_chosen_disposition.value] += 1
+
+    patterns: list[CategoryPattern] = []
+    for category, counts in by_category.items():
+        ranked = counts.most_common()
+        # Mirrors suggest_disposition(): a tie is reported as a tie rather than
+        # resolved into a preference the family never expressed.
+        split = len(ranked) > 1 and ranked[0][1] == ranked[1][1]
+        patterns.append(
+            CategoryPattern(
+                category=category,
+                total=sum(counts.values()),
+                counts=dict(counts),
+                leaning=None if split else ranked[0][0],
+                leaning_count=0 if split else ranked[0][1],
+                split=split,
+            )
+        )
+    # Strongest habit first — that is the one worth reading.
+    patterns.sort(key=lambda p: (-p.total, p.category))
+
+    return OverrideLogResponse(
+        estate_id=estate_id,
+        count=len(entries),
+        entries=[
+            OverrideEntry(
+                item_id=e.item_id,
+                item_category=e.item_category,
+                ai_suggested_disposition=e.ai_suggested_disposition.value,
+                executor_chosen_disposition=e.executor_chosen_disposition.value,
+                created_at=e.created_at,
+                steward_had_a_view=e.ai_suggested_disposition
+                is not SuggestedDisposition.UNCERTAIN,
+                agreed=e.ai_suggested_disposition == e.executor_chosen_disposition,
+            )
+            for e in entries
+        ],
+        patterns=patterns,
     )
 
 

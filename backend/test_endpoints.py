@@ -47,6 +47,11 @@ from test_claims import ESTATE_ID, reset_item
 from test_dispositions import clear_decision
 from test_resolutions import clear_resolution
 
+
+from test_guard import require_destructive_ok
+
+require_destructive_ok(__name__, "test_endpoints.py", "the test-ep-* items, memberships, resolutions and dispositions")
+
 EXECUTOR_EMAIL = "steward-test-executor@example.com"
 BENEFICIARY_EMAIL = "steward-test-beneficiary@example.com"
 # No membership on this estate — the "authenticated but unauthorized" actor.

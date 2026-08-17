@@ -21,6 +21,11 @@ from membership import (
 )
 from models import MembershipRole
 
+
+from test_guard import require_destructive_ok
+
+require_destructive_ok(__name__, "test_membership.py", "test-account memberships on the seeded estate")
+
 ESTATE_ID = "seed-estate-001"
 
 PEOPLE = [

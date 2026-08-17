@@ -23,6 +23,11 @@ from firebase_app import PROJECT_ID, get_db
 from items import classify_and_create_item
 from models import Item, ItemStatus
 
+
+from test_guard import require_destructive_ok
+
+require_destructive_ok(__name__, "test_classify.py", "test-classify-sample-001 and test-classify-blank-001")
+
 ESTATE_ID = "seed-estate-001"
 BACKEND = Path(__file__).parent
 SAMPLE_IMAGE = BACKEND / "test_data" / "sample_item.png"

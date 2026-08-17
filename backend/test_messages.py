@@ -32,6 +32,11 @@ from test_claims import BENEFICIARIES, ESTATE_ID, ITEM_B_ID, reset_item
 from test_classify import BLANK_IMAGE, BLANK_ITEM_ID, make_blank_square
 
 
+
+from test_guard import require_destructive_ok
+
+require_destructive_ok(__name__, "test_messages.py", "the test-message items and their threads")
+
 def clear_messages(item_id: str) -> int:
     """Delete every message about `item_id` so this run posts its own."""
     stale = (

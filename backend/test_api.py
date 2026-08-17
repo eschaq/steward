@@ -36,6 +36,11 @@ from models import Item, ItemStatus, MembershipRole, SuggestedDisposition, User
 from test_claims import BENEFICIARIES, ESTATE_ID, reset_item
 from test_messages import clear_messages
 
+
+from test_guard import require_destructive_ok
+
+require_destructive_ok(__name__, "test_api.py", "the test-api-* items and their messages")
+
 CLARIFY_ITEM = "test-api-clarify"
 CONTESTED_ITEM = "test-api-contested"
 INELIGIBLE_ITEM = "test-api-unclaimed"

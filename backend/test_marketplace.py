@@ -22,6 +22,7 @@ call so recommendation quality could not be judged.
 """
 
 import sys
+from datetime import datetime, timezone
 
 from dispositions import get_disposition, record_disposition_decision
 from firebase_app import PROJECT_ID, get_db
@@ -35,11 +36,13 @@ from marketplace import (
 )
 from membership import accept_invite, create_auth_user, invite_to_estate
 from models import (
+    Item,
     ItemStatus,
     ListingStatus,
     MarketplaceListing,
     MembershipRole,
     Platform,
+    Resolution,
     ResolutionType,
     SuggestedDisposition,
 )
@@ -48,11 +51,92 @@ from test_claims import BENEFICIARIES, ESTATE_ID
 from test_dispositions import clear_decision
 from test_resolutions import EXECUTOR, clear_resolution
 
-# Two resolved items in genuinely different categories, so a boilerplate answer
-# would show up as two near-identical reasons.
-SELL_ITEMS = ["demo-brass-lamp", "demo-canteen-cutlery"]
-DONATE_ITEM = "demo-dinner-service"
-NO_DISPOSITION_ITEM = "demo-hall-rug"
+
+from test_guard import require_destructive_ok
+
+require_destructive_ok(__name__, "test_marketplace.py", "the test-marketplace-* items it owns")
+
+# Fixtures this suite creates and owns outright.
+#
+# These used to be demo-brass-lamp, demo-canteen-cutlery, demo-dinner-service
+# and demo-hall-rug — real inventory a walkthrough shows. Every run cleared
+# their listings and dispositions and re-decided them, so running the suite
+# silently rewrote four items someone might be about to demo. Nothing here
+# touches `demo-*` any more.
+#
+# Two sell items in genuinely different categories, because a boilerplate answer
+# would show up as two near-identical reasons. The condition notes are
+# deliberately rich: the suite asserts each recommendation draws at least two
+# distinctive words from the item's own record, which needs a record with
+# distinctive words in it.
+SELL_ITEMS = ["test-marketplace-lamp", "test-marketplace-cutlery"]
+DONATE_ITEM = "test-marketplace-dinnerware"
+NO_DISPOSITION_ITEM = "test-marketplace-undecided"
+
+FIXTURES = {
+    "test-marketplace-lamp": (
+        "table lamp",
+        "Brass column lamp with a pleated shade. Rewired at some point — the "
+        "flex is modern and correctly earthed. Shade is water-stained along one "
+        "side and slightly out of round.",
+        "brass, 1970s",
+    ),
+    "test-marketplace-cutlery": (
+        "silverware",
+        "Canteen of cutlery in a baize-lined oak box, service for six. Plating "
+        "has worn to the copper on the spoon backs. Two teaspoons are missing "
+        "and the box lock does not catch.",
+        "Sheffield plate, unmarked",
+    ),
+    "test-marketplace-dinnerware": (
+        "dinnerware",
+        "Twelve-place dinner service, transfer-printed in blue. Two side plates "
+        "are chipped at the rim and the gravy boat is missing its stand.",
+        "Wedgwood, Etruria mark, c. 1930",
+    ),
+    "test-marketplace-undecided": (
+        "rug",
+        "Wool hall runner, worn through to the backing in one patch near the door.",
+        None,
+    ),
+}
+
+
+def make_fixture(item_id: str, executor_uid: str) -> None:
+    """Create the item this suite owns, resolved and ready for a disposition.
+
+    Written directly rather than driven through claim → resolve, because what is
+    under test is the marketplace recommendation, not the claim flow — and a
+    fixture that depends on three other subsystems fails for three reasons that
+    have nothing to do with it.
+    """
+    category, notes, era = FIXTURES[item_id]
+    db = get_db()
+    db.collection(Item.COLLECTION).document(item_id).set(
+        {
+            "id": item_id,
+            "estate_id": ESTATE_ID,
+            "photo_urls": [],
+            "ai_category": category,
+            "ai_condition_notes": notes,
+            "ai_est_era_or_brand": era,
+            "ai_classification_confidence": 0.95,
+            "suggested_disposition": SuggestedDisposition.UNCERTAIN.value,
+            "status": ItemStatus.RESOLVED.value,
+            "created_at": datetime.now(timezone.utc),
+        }
+    )
+    db.collection(Resolution.COLLECTION).document(f"resolution__{item_id}").set(
+        {
+            "id": f"resolution__{item_id}",
+            "item_id": item_id,
+            "resolved_by_user_id": executor_uid,
+            "resolution_type": ResolutionType.EXECUTOR_OVERRIDE.value,
+            "resolved_to_user_id": None,
+            "notes": "Fixture: resolved so a disposition can be recorded.",
+            "resolved_at": datetime.now(timezone.utc),
+        }
+    )
 
 # Words that mean the model wrote marketing copy rather than talking to a family.
 HUSTLE = ["maximis", "maximiz", "best price", "top dollar", "act fast", "don't miss",
@@ -96,28 +180,14 @@ def main() -> int:
     invite_to_estate(ESTATE_ID, beneficiary_email, MembershipRole.BENEFICIARY)
     accept_invite(ESTATE_ID, beneficiary_uid)
 
-    for item_id in SELL_ITEMS + [DONATE_ITEM]:
+    # Own fixtures, made fresh each run — no dependence on what a re-seed or a
+    # live walkthrough happens to have left behind.
+    for item_id in SELL_ITEMS + [DONATE_ITEM, NO_DISPOSITION_ITEM]:
         clear_listing(item_id)
         clear_decision(item_id)
+        make_fixture(item_id, executor_uid)
         item = get_item(item_id)
-        if item is None:
-            print(f"  FAIL     no item {item_id} to work with")
-            return 1
-        # Some of these are claimed rather than resolved after a re-seed; a
-        # disposition needs a resolved item, so resolve first if need be.
-        if item.status is not ItemStatus.RESOLVED:
-            if get_resolution(item_id) is None:
-                resolve_item(
-                    item_id,
-                    resolved_by_user_id=executor_uid,
-                    resolution_type=ResolutionType.EXECUTOR_OVERRIDE,
-                    notes="Resolved so a disposition can be recorded.",
-                )
-            item = get_item(item_id)
-        print(f"  {item_id:24} {item.ai_category:16} {item.status.value}")
-
-    clear_listing(NO_DISPOSITION_ITEM)
-    clear_decision(NO_DISPOSITION_ITEM)
+        print(f"  {item_id:28} {item.ai_category:14} {item.status.value}")
     print()
 
     # --- (a) and (b) two sell items, two recommendations -------------------

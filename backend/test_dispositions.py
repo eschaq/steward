@@ -46,6 +46,11 @@ from resolutions import resolve_item
 from test_claims import BENEFICIARIES, ESTATE_ID, reset_item
 from test_resolutions import EXECUTOR, clear_resolution
 
+
+from test_guard import require_destructive_ok
+
+require_destructive_ok(__name__, "test_dispositions.py", "the test-disposition-* items, their dispositions and override logs")
+
 CATEGORY = "test-disposition-category"
 
 ITEM_DONATE = "test-disposition-donate"

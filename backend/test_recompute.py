@@ -43,6 +43,11 @@ from test_overrides import (
 )
 from test_resolutions import EXECUTOR
 
+
+from test_guard import require_destructive_ok
+
+require_destructive_ok(__name__, "test_recompute.py", "the test-recompute items")
+
 # The item resolved and already decided — case (b) leaves this one alone.
 RESOLVED_ITEM = HISTORY_ITEM_IDS[0]
 
