@@ -15,7 +15,7 @@ import { Claimants } from '../components/Claimants'
 import { EstateNav } from '../components/EstateNav'
 import { MessageThread } from '../components/MessageThread'
 import { StatusChip } from '../components/StatusChip'
-import { ESTATE_ID } from '../firebase'
+import { estateId } from '../firebase'
 import {
   RESOLUTION_HELP,
   RESOLUTION_LABEL,
@@ -65,7 +65,7 @@ export function ResolveItem() {
     setProblem(null)
     try {
       const [standing, fetched, asked, thread, decided] = await Promise.all([
-        fetchMe(ESTATE_ID),
+        fetchMe(estateId()),
         fetchItem(itemId),
         fetchItemClaims(itemId),
         fetchItemMessages(itemId),

@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react'
 import {
+  createUserWithEmailAndPassword,
   onAuthStateChanged,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
@@ -18,13 +19,17 @@ import {
 
 import { useNavigate } from 'react-router-dom'
 
-import { auth } from './firebase'
+import { auth, clearEstateId } from './firebase'
 
 interface AuthState {
   user: User | null
   /** False once Firebase has told us whether a session was restored. */
   loading: boolean
   signIn: (email: string, password: string) => Promise<void>
+  /** Create a real Firebase Auth account. Until this existed the only ways in
+   * were an executor's invitation or a script, which meant nobody could try
+   * the product. */
+  signUp: (email: string, password: string) => Promise<void>
   /** Ask Firebase to email a link for setting a password.
    *
    * This is how an invited person gets in for the first time. An invite creates
@@ -54,10 +59,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn: async (email, password) => {
         await signInWithEmailAndPassword(auth, email, password)
       },
+      signUp: async (email, password) => {
+        await createUserWithEmailAndPassword(auth, email, password)
+      },
       sendResetEmail: async (email) => {
         await sendPasswordResetEmail(auth, email)
       },
       leave: async () => {
+        // The estate goes with the session: on a shared machine the next person
+        // must not inherit the last one's.
+        clearEstateId()
         await signOut(auth)
         // Clear the destination as well as the session. Without this the URL
         // survives sign-out, so on a shared laptop the next person to sign in
@@ -95,11 +106,21 @@ export function readableAuthError(error: unknown): string {
     case 'auth/wrong-password':
     case 'auth/user-not-found':
       return "That email and password don't match an account. Worth another try?"
+    // Sign-up's own failures. Without these the default branch shows people a
+    // raw Firebase string at the moment they are trying to start.
+    case 'auth/email-already-in-use':
+      return 'There\'s already an account with that email — sign in instead?'
+    case 'auth/weak-password':
+      return 'That password is a bit short — six characters or more.'
+    case 'auth/missing-password':
+      return 'Put a password in as well.'
+    case 'auth/operation-not-allowed':
+      return "New accounts aren't switched on for this project yet."
     case 'auth/too-many-requests':
       return 'Too many attempts just now. Give it a minute and try again.'
     case 'auth/network-request-failed':
       return "Couldn't reach the sign-in service. Check your connection?"
     default:
-      return `Sign-in didn't work: ${(error as Error)?.message ?? String(error)}`
+      return `That didn't work: ${(error as Error)?.message ?? String(error)}`
   }
 }

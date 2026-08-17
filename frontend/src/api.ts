@@ -159,6 +159,32 @@ export async function postEstateMessage(
 
 /** What the caller is on this estate — used to decide what to offer, never as
  * the authorization itself. Every write is still checked server-side. */
+export interface EstateSummary {
+  id: string
+  name: string
+  role: 'executor' | 'beneficiary'
+  created_at: string
+}
+
+/** Every estate this account belongs to. What the app routes on after sign-in,
+ * replacing the assumption that there is exactly one and its id is known at
+ * build time. */
+export async function fetchMyEstates(): Promise<{
+  count: number
+  estates: EstateSummary[]
+}> {
+  const response = await authorizedFetch('/me/estates')
+  return (await response.json()) as { count: number; estates: EstateSummary[] }
+}
+
+export async function createEstate(name: string): Promise<EstateSummary> {
+  const response = await authorizedFetch('/estates', {
+    method: 'POST',
+    body: { name },
+  })
+  return (await response.json()) as EstateSummary
+}
+
 export async function fetchMe(estateId: string): Promise<Me> {
   const response = await authorizedFetch(`/estates/${encodeURIComponent(estateId)}/me`)
   return (await response.json()) as Me

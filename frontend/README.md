@@ -78,6 +78,66 @@ the final call is theirs to record and that Steward suggests but doesn't decide.
 All six are wired to the real backend against real Firestore. There is no mock
 data anywhere in here.
 
+## Deployed
+
+**https://steward-frontend-223877730603.us-central1.run.app** — us-central1,
+revision `steward-frontend-00002-9tb`, pointed at the backend on Cloud Run
+(`steward-backend-00004-fhz`).
+
+Self-serve sign-up and estate creation are live. **Both services had to move
+together**: the frontend's new flow calls `POST /estates` and `GET /me/estates`,
+which the deployed backend did not have — a frontend-only redeploy would have
+shipped a sign-up button that 404s the moment someone uses it.
+
+```
+min instances  0        scales to zero when idle
+max instances  3        the spend ceiling
+concurrency    80       requests per instance
+cpu / memory   1 / 512Mi
+```
+
+**Why max 3, against the backend's 5.** This service returns files from disk —
+no Firestore, no Vertex, no per-request cost beyond bandwidth. 3 × 80 is 240
+concurrent requests for a hackathon demo, and a static server that cannot keep
+up at that point has a different problem than instance count. It is also the
+service most likely to be hit by something other than a user (a crawler, a
+link preview), so a low cap is the sensible place to put the ceiling.
+
+**A multi-stage build.** `node:20-slim` produces `dist/`, then `nginx:alpine`
+serves it — nothing from `node_modules` reaches the running image, which is why
+this runs on half the memory of the backend.
+
+**Every `VITE_*` value is baked in at build time.** Vite substitutes
+`import.meta.env.*` during the build, so `VITE_API_BASE_URL` and the Firebase
+web config are Docker **build args**, not runtime environment — setting them on
+the Cloud Run service would do nothing. Confirmed in the shipped bundle: it
+contains the Cloud Run backend URL and **zero** occurrences of `localhost:8000`.
+
+`nginx.conf.template` handles two things the default config does not: it binds
+`${PORT}` (substituted at container start by nginx:alpine's own entrypoint,
+rather than assuming 8080), and it falls through to `index.html` so a deep link
+like `/items/abc` resolves — react-router uses real URLs, and without that a
+refresh on any route would 404. Verified: `/review`, `/family` and
+`/items/{id}` all return 200 directly.
+
+**Two things had to be granted before sign-in would work**, neither obvious
+until it fails:
+
+- the backend's `STEWARD_ALLOWED_ORIGINS` had to gain this origin, or every
+  browser call fails CORS;
+- the host had to be added to **Firebase Auth's authorized domains**, or
+  sign-in itself is rejected. It held only the two `firebaseapp.com`/`web.app`
+  defaults plus `localhost`.
+
+`STEWARD_APP_URL` was set to this origin at the same time, so invitation emails
+now carry a working link.
+
+Verified end to end in a real browser against both live services: sign-in
+rendered in 2.1s including cold start, dashboard in 2.9s, **49 items** of real
+production data, ledger reading Settled 15 / Needs a talk 5 / Needs a look 12,
+and an item detail as a second authenticated round trip. Eight cross-origin
+calls to Cloud Run, **zero non-2xx**, no localhost anywhere.
+
 ## Running it
 
 Both servers, in two terminals:

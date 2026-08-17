@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 
-import { ApiError, fetchEstateMessages, postEstateMessage } from '../api'
+import { ApiError, fetchEstateMessages, fetchMe, postEstateMessage } from '../api'
 import { useAuth } from '../auth'
 import { EstateNav } from '../components/EstateNav'
 import { MessageThread } from '../components/MessageThread'
-import { ESTATE_ID } from '../firebase'
-import type { Message } from '../types'
+import { estateId } from '../firebase'
+import type { Me, Message } from '../types'
 
 /** The estate's whole feed, in one place.
  *
@@ -23,12 +23,18 @@ export function MessageCenter() {
   const [problem, setProblem] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
   const [posting, setPosting] = useState(false)
+  // Only for the estate's name in the hero — the feed itself needs no role.
+  const [me, setMe] = useState<Me | null>(null)
 
   const load = useCallback(async () => {
     setProblem(null)
     try {
-      const feed = await fetchEstateMessages(ESTATE_ID)
-      setMessages(feed.messages)
+      const [body, standing] = await Promise.all([
+        fetchEstateMessages(estateId()),
+        fetchMe(estateId()),
+      ])
+      setMe(standing)
+      setMessages(body.messages)
     } catch (error) {
       setProblem(
         error instanceof ApiError ? error.message : `Couldn't load the feed: ${error}`,
@@ -44,19 +50,14 @@ export function MessageCenter() {
     event.preventDefault()
     const text = draft.trim()
     if (!text) return
-
     setProblem(null)
     setPosting(true)
     try {
-      const posted = await postEstateMessage(ESTATE_ID, text)
       // Append the server's own copy rather than refetching: it comes back with
-      // the author name and timestamp already resolved, so the message appears
-      // at once without a round trip that could reorder the feed underneath.
-      //
-      // Only ever append to a feed we actually have. Appending to `null` would
-      // replace the whole feed with the one message just posted — the compose
-      // button is disabled until the load resolves for the same reason.
-      setMessages((current) => (current === null ? [posted] : [...current, posted]))
+      // the author name and timestamp already resolved, so it appears at once
+      // without a round trip that could reorder the feed underneath.
+      const posted = await postEstateMessage(estateId(), text)
+      setMessages((current) => (current ? [...current, posted] : current))
       setDraft('')
     } catch (error) {
       setProblem(
@@ -83,33 +84,11 @@ export function MessageCenter() {
             </button>
           </div>
         </div>
-
         <div>
-          <div className="eyebrow eyebrow--on-ink">{ESTATE_ID}</div>
+          <div className="eyebrow eyebrow--on-ink">{me?.estate_name ?? estateId()}</div>
           <h1 className="display hero__title">Messages</h1>
         </div>
       </header>
-
-      <form className="compose" onSubmit={onPost}>
-        <label className="compose__label" htmlFor="compose">
-          Say something to the family. Everyone on this estate will see it.
-        </label>
-        <textarea
-          id="compose"
-          className="compose__box"
-          rows={3}
-          placeholder="I'm free the weekend after next if anyone wants to go through the study together."
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-        />
-        <button
-          className="button button--primary"
-          type="submit"
-          disabled={posting || messages === null || draft.trim().length === 0}
-        >
-          {posting ? 'Posting…' : 'Post to the feed'}
-        </button>
-      </form>
 
       {problem && (
         <p className="notice notice--problem" role="alert">
@@ -120,17 +99,37 @@ export function MessageCenter() {
         </p>
       )}
 
-      {!problem && messages === null && <p className="notice">Reading the feed…</p>}
+      <section className="compose">
+        <label className="compose__label" htmlFor="compose-text">
+          Say something to the family. Everyone on this estate will see it.
+        </label>
+        <textarea
+          id="compose-text"
+          className="compose__text"
+          rows={3}
+          placeholder="I'm free the weekend after next if anyone wants to go through the study together."
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+        />
+        <button
+          className="button button--primary"
+          type="button"
+          onClick={(event) => void onPost(event)}
+          disabled={posting || !draft.trim() || messages === null}
+        >
+          {posting ? 'Posting…' : 'Post to the feed'}
+        </button>
+      </section>
 
       {messages !== null && (
         <section className="thread-section">
           <h2 className="eyebrow">
-            {messages.length === 1 ? '1 message' : `${messages.length} messages`}
+            {messages.length} {messages.length === 1 ? 'message' : 'messages'}
           </h2>
           <MessageThread
             messages={messages}
             showItems
-            empty="Nothing said yet. The feed fills up as the family works through the estate."
+            empty="Nothing said yet. The first message is usually the hardest."
           />
         </section>
       )}

@@ -14,12 +14,15 @@ import { StewardLockup } from '../components/StewardMark'
  * index.css, so a phone gets the tall frame and a desktop the wide one.
  */
 export function SignIn() {
-  const { signIn, sendResetEmail } = useAuth()
+  const { signIn, signUp, sendResetEmail } = useAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [problem, setProblem] = useState<string | null>(null)
   const [working, setWorking] = useState(false)
   const [sent, setSent] = useState<string | null>(null)
+  // One form, two intents. A separate sign-up screen would be a second place
+  // to get lost in, and the fields are identical either way.
+  const [mode, setMode] = useState<'in' | 'up'>('in')
   const hero = useRef<HTMLVideoElement>(null)
 
   /* Autoplay, made to actually happen.
@@ -68,7 +71,8 @@ export function SignIn() {
     setProblem(null)
     setWorking(true)
     try {
-      await signIn(email.trim(), password)
+      if (mode === 'up') await signUp(email.trim(), password)
+      else await signIn(email.trim(), password)
       // No navigation here: the auth listener swaps the screen once Firebase
       // reports the new user.
     } catch (error) {
@@ -139,12 +143,24 @@ export function SignIn() {
 
         <div className="signin__welcome">
           <h1 className="signin__head">
-            Welcome back.
-            <br />
-            Take your time.
+            {mode === 'in' ? (
+              <>
+                Welcome back.
+                <br />
+                Take your time.
+              </>
+            ) : (
+              <>
+                Somewhere to
+                <br />
+                start.
+              </>
+            )}
           </h1>
           <p className="signin__under">
-            The house will be exactly where you left it.
+            {mode === 'in'
+              ? 'The house will be exactly where you left it.'
+              : "Make an account, and we'll set up the estate next."}
           </p>
         </div>
 
@@ -167,7 +183,7 @@ export function SignIn() {
             <input
               id="password"
               type="password"
-              autoComplete="current-password"
+              autoComplete={mode === 'in' ? 'current-password' : 'new-password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -190,8 +206,29 @@ export function SignIn() {
           {/* Clay, not cream: with cream fields above it, a cream button reads as
               a third input rather than the thing you press. */}
           <button className="button button--primary" type="submit" disabled={working}>
-            {working ? 'Signing in…' : 'Sign in'}
+            {working
+              ? mode === 'in'
+                ? 'Signing in…'
+                : 'Setting you up…'
+              : mode === 'in'
+                ? 'Sign in'
+                : 'Create an account'}
           </button>
+
+          <p className="signin__switch">
+            {mode === 'in' ? "Not got an account? " : 'Already have one? '}
+            <button
+              className="signin__switch-button"
+              type="button"
+              onClick={() => {
+                setMode(mode === 'in' ? 'up' : 'in')
+                setProblem(null)
+                setSent(null)
+              }}
+            >
+              {mode === 'in' ? 'Make one' : 'Sign in instead'}
+            </button>
+          </p>
         </form>
 
         <button

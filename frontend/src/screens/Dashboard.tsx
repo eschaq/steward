@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 
 import { ApiError, fetchEstateItems, fetchMe } from '../api'
 import { useAuth } from '../auth'
-import { ESTATE_ID } from '../firebase'
+import { estateId } from '../firebase'
 import { AddItem } from '../components/AddItem'
 import { ItemCard } from '../components/ItemCard'
 import { StatusFilters, type Filter } from '../components/StatusFilters'
@@ -36,8 +36,8 @@ export function Dashboard() {
     setProblem(null)
     try {
       const [body, standing] = await Promise.all([
-        fetchEstateItems(ESTATE_ID),
-        fetchMe(ESTATE_ID),
+        fetchEstateItems(estateId()),
+        fetchMe(estateId()),
       ])
       setItems(body.items)
       setMe(standing)
@@ -108,7 +108,7 @@ export function Dashboard() {
         </div>
 
         <div>
-          <div className="eyebrow eyebrow--on-ink">{ESTATE_ID}</div>
+          <div className="eyebrow eyebrow--on-ink">{me?.estate_name ?? estateId()}</div>
           <h1 className="display hero__title">Inventory</h1>
         </div>
 

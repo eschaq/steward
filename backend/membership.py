@@ -14,7 +14,7 @@ from firebase_admin import auth
 from google.cloud import firestore as gcf
 
 from firebase_app import get_app, get_db
-from models import EstateMembership, MembershipRole, RoleType, User
+from models import Estate, EstateMembership, EstateStatus, MembershipRole, RoleType, User
 
 
 class MembershipError(Exception):
@@ -68,6 +68,144 @@ def create_auth_user(email: str, display_name: Optional[str] = None) -> str:
         merge=True,
     )
     return record.uid
+
+
+def ensure_user_document(user_id: str) -> Optional[User]:
+    """Mirror a Firebase Auth account into `users`, if it isn't there already.
+
+    `create_auth_user` does this for anyone an executor invites, but a self-serve
+    sign-up creates the Auth account directly in the browser and never touches
+    Firestore — so without this their name and email exist nowhere the app can
+    read. The frontend cannot read `users`, so every place that resolves a
+    display name (the family list, message authors, claimants) would show
+    "someone" forever.
+
+    Idempotent and merge-based: an existing mirror keeps its created_at.
+    """
+    get_app()
+    db = get_db()
+    doc_ref = db.collection(User.COLLECTION).document(user_id)
+    if doc_ref.get().exists:
+        return None
+
+    try:
+        record = auth.get_user(user_id)
+    except Exception:  # noqa: BLE001 — no Auth record is not worth failing a write
+        return None
+
+    email = record.email or ""
+    user = User(
+        id=user_id,
+        email=email,
+        # Firebase has no display name for an email/password sign-up, so the
+        # local part is the best guess available. It is a name they can be
+        # called by, not a claim about who they are.
+        display_name=record.display_name or (email.split("@")[0] if email else "Someone"),
+        role_type=RoleType.HUMAN,
+    )
+    doc_ref.set(
+        {
+            "id": user.id,
+            "email": user.email,
+            "display_name": user.display_name,
+            "role_type": user.role_type.value,
+            "created_at": user.created_at,
+        },
+        merge=True,
+    )
+    return user
+
+
+def create_estate(name: str, executor_user_id: str) -> Estate:
+    """Start a new estate, with its creator as executor.
+
+    **Accepted immediately, with no invite step.** Every other membership starts
+    pending because somebody else asked for it; this one is the person doing the
+    asking, and leaving them to accept their own invitation would be ceremony
+    with nothing on the other side of it.
+
+    The estate id is a Firestore document id rather than anything derived from
+    the name — two families may both call it "Mum's house", and a slug would
+    collide or leak the name into a URL.
+    """
+    name = (name or "").strip()
+    if not name:
+        raise MembershipError("An estate needs a name — even just a surname.")
+
+    # A self-serve creator may have no `users` mirror yet — see above.
+    ensure_user_document(executor_user_id)
+
+    db = get_db()
+    estate_ref = db.collection(Estate.COLLECTION).document()
+    estate = Estate(
+        id=estate_ref.id,
+        name=name,
+        executor_user_id=executor_user_id,
+        status=EstateStatus.ACTIVE,
+    )
+    membership = EstateMembership(
+        id=membership_id(estate.id, executor_user_id),
+        estate_id=estate.id,
+        user_id=executor_user_id,
+        role=MembershipRole.EXECUTOR,
+    )
+
+    # One batch: an estate with no executor would be unreachable by anyone,
+    # including the person who just made it.
+    batch = db.batch()
+    batch.set(estate_ref, {
+        "id": estate.id,
+        "name": estate.name,
+        "executor_user_id": estate.executor_user_id,
+        "status": estate.status.value,
+        "created_at": estate.created_at,
+    })
+    batch.set(
+        db.collection(EstateMembership.COLLECTION).document(membership.id),
+        {
+            "id": membership.id,
+            "estate_id": membership.estate_id,
+            "user_id": membership.user_id,
+            "role": membership.role.value,
+            "invited_at": membership.invited_at,
+            "accepted_at": gcf.SERVER_TIMESTAMP,
+        },
+    )
+    batch.commit()
+    return estate
+
+
+def estates_for_user(user_id: str) -> list[tuple[Estate, MembershipRole]]:
+    """Every estate this person belongs to, with the role they hold there.
+
+    Accepted memberships only — a pending invite grants no role, which is the
+    same rule `get_role()` applies, so an unaccepted invitation must not make an
+    estate look like somewhere you can already go.
+
+    Ordered by when the estate was created, so "the first one" is stable rather
+    than whatever Firestore returns first.
+    """
+    db = get_db()
+    snapshots = (
+        db.collection(EstateMembership.COLLECTION)
+        .where(filter=gcf.FieldFilter("user_id", "==", user_id))
+        .get()
+    )
+    memberships = [EstateMembership.model_validate(s.to_dict()) for s in snapshots]
+    accepted = [m for m in memberships if m.accepted_at is not None]
+    if not accepted:
+        return []
+
+    refs = [
+        db.collection(Estate.COLLECTION).document(m.estate_id) for m in accepted
+    ]
+    estates = {
+        s.id: Estate.model_validate(s.to_dict()) for s in db.get_all(refs) if s.exists
+    }
+    pairs = [
+        (estates[m.estate_id], m.role) for m in accepted if m.estate_id in estates
+    ]
+    return sorted(pairs, key=lambda pair: pair[0].created_at)
 
 
 def invite_to_estate(

@@ -5,7 +5,7 @@ import { ApiError, fetchMe, fetchReview, resolveItem } from '../api'
 import { useAuth } from '../auth'
 import { EstateNav } from '../components/EstateNav'
 import { StatusChip } from '../components/StatusChip'
-import { ESTATE_ID } from '../firebase'
+import { estateId } from '../firebase'
 import {
   REVIEW_ORDER,
   RESOLUTION_LABEL,
@@ -47,9 +47,9 @@ export function Review() {
   const load = useCallback(async () => {
     setProblem(null)
     try {
-      const standing = await fetchMe(ESTATE_ID)
+      const standing = await fetchMe(estateId())
       setMe(standing)
-      if (standing.role) setRows((await fetchReview(ESTATE_ID)).rows)
+      if (standing.role) setRows((await fetchReview(estateId())).rows)
     } catch (error) {
       setProblem(
         error instanceof ApiError ? error.message : `Couldn't load the review: ${error}`,
@@ -84,7 +84,7 @@ export function Review() {
       })
       // Refetch the whole table: resolving moves the row between groups and
       // changes the counts above it, neither of which the client should guess.
-      setRows((await fetchReview(ESTATE_ID)).rows)
+      setRows((await fetchReview(estateId())).rows)
     } catch (error) {
       setProblem(
         error instanceof ApiError ? error.message : `Couldn't settle that: ${error}`,
@@ -113,7 +113,7 @@ export function Review() {
           </div>
         </div>
         <div>
-          <div className="eyebrow eyebrow--on-ink">{ESTATE_ID}</div>
+          <div className="eyebrow eyebrow--on-ink">{me?.estate_name ?? estateId()}</div>
           <h1 className="display hero__title">Review</h1>
         </div>
       </header>

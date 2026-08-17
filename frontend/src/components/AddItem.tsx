@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 
 import { ApiError, addEstateItem, photoConcern } from '../api'
-import { ESTATE_ID } from '../firebase'
+import { estateId } from '../firebase'
 import type { Item } from '../types'
 
 /** Add a belonging to the estate, from a photograph.
@@ -42,7 +42,7 @@ export function AddItem({ onAdded }: { onAdded: (item: Item) => void }) {
     // truer account of the pause than "Loading…".
     const reading = window.setTimeout(() => setStage('reading'), 1200)
     try {
-      onAdded(await addEstateItem(ESTATE_ID, file, acceptAnyway))
+      onAdded(await addEstateItem(estateId(), file, acceptAnyway))
     } catch (error) {
       // The pre-check's verdict is an offer, not a refusal: hold the file and
       // let them look at the picture again, or overrule it.

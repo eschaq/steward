@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import { ApiError, fetchMe, fetchMembers, inviteToEstate } from '../api'
 import { useAuth } from '../auth'
 import { EstateNav } from '../components/EstateNav'
-import { ESTATE_ID } from '../firebase'
+import { estateId } from '../firebase'
 import { ROLE_HELP, ROLE_LABEL, type Me, type Member } from '../types'
 
 const ROLES = ['beneficiary', 'executor'] as const
@@ -50,8 +50,8 @@ export function Family() {
     setProblem(null)
     try {
       const [standing, list] = await Promise.all([
-        fetchMe(ESTATE_ID),
-        fetchMembers(ESTATE_ID),
+        fetchMe(estateId()),
+        fetchMembers(estateId()),
       ])
       setMe(standing)
       setMembers(list.members)
@@ -76,12 +76,12 @@ export function Family() {
     setInvited(null)
     setSending(true)
     try {
-      const membership = await inviteToEstate(ESTATE_ID, {
+      const membership = await inviteToEstate(estateId(), {
         email: address,
         role,
         display_name: name.trim() || undefined,
       })
-      setMembers((await fetchMembers(ESTATE_ID)).members)
+      setMembers((await fetchMembers(estateId())).members)
       setInvited({
         email: address,
         emailed: membership.invite_email_sent,
@@ -119,7 +119,7 @@ export function Family() {
           </div>
         </div>
         <div>
-          <div className="eyebrow eyebrow--on-ink">{me?.estate_name ?? ESTATE_ID}</div>
+          <div className="eyebrow eyebrow--on-ink">{me?.estate_name ?? estateId()}</div>
           <h1 className="display hero__title">Family</h1>
         </div>
       </header>

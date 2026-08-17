@@ -2746,3 +2746,75 @@ h3 {
   gap: 10px;
   flex-wrap: wrap;
 }
+
+/* --- naming a new estate --------------------------------------------------- */
+
+.create-estate {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 26px;
+  max-width: 420px;
+}
+
+.create-estate__label {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: rgba(249, 239, 232, 0.74);
+}
+
+/* Cream on Ink, matching the sign-in fields: a translucent dark field
+   dissolves into the surface behind it and stops looking like somewhere you
+   can type. */
+.create-estate__input {
+  font-family: var(--sans);
+  font-size: 16px;
+  height: 52px;
+  padding: 0 18px;
+  color: var(--on-surface);
+  background: var(--surface-low);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--r-row);
+}
+
+.create-estate__input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(142, 72, 49, 0.22);
+}
+
+.create-estate__input:disabled {
+  opacity: 0.7;
+}
+
+.create-estate .button {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
+.create-estate__who {
+  margin: 0;
+  font-size: 13px;
+  color: var(--on-ink-faint);
+}
+
+/* Sign in / make an account — one form, two intents. */
+.signin__switch {
+  margin: 14px 0 0;
+  font-size: 14px;
+  color: var(--on-ink-muted);
+}
+
+.signin__switch-button {
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--on-ink);
+  background: none;
+  border: none;
+  padding: 4px 0;
+  min-height: 24px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

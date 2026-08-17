@@ -1,0 +1,31 @@
+server {
+  listen ${PORT};
+  server_name _;
+  root /usr/share/nginx/html;
+
+  # Long-lived caching for the hashed build output, none for the entry point —
+  # otherwise a deploy leaves people on the previous bundle.
+  location /assets/ {
+    expires 1y;
+    add_header Cache-Control "public, immutable";
+  }
+
+  # The hero clip and stills are replaced by hand and versioned with a ?v=
+  # query, so they can be cached hard too.
+  location /brand/ {
+    expires 30d;
+    add_header Cache-Control "public";
+  }
+
+  # A single-page app with real URLs: /items/abc is a route, not a file, so
+  # anything that isn't on disk has to fall through to index.html or a refresh
+  # on a deep link would 404.
+  location / {
+    try_files $uri $uri/ /index.html;
+    add_header Cache-Control "no-cache";
+  }
+
+  gzip on;
+  gzip_types text/css application/javascript application/json image/svg+xml;
+  gzip_min_length 1024;
+}

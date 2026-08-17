@@ -24,7 +24,7 @@ import { Disposition } from '../components/Disposition'
 import { MessageThread } from '../components/MessageThread'
 import { StatusChip } from '../components/StatusChip'
 import { StewardLockup } from '../components/StewardMark'
-import { ESTATE_ID } from '../firebase'
+import { estateId } from '../firebase'
 import {
   STATUS_MEANING,
   firstPhoto,
@@ -73,7 +73,7 @@ export function ItemDetail() {
         fetchItem(itemId),
         fetchItemMessages(itemId),
         fetchItemClaims(itemId),
-        fetchMe(ESTATE_ID),
+        fetchMe(estateId()),
         fetchItemDisposition(itemId),
       ])
       setItem(fetched)

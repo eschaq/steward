@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+brand-source/
+mockups/
+verify*.mjs
+verify-*.png
+*.log

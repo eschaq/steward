@@ -71,6 +71,8 @@ from membership import (
     MembershipRole,
     accept_invite,
     create_auth_user,
+    create_estate,
+    estates_for_user,
     invite_to_estate,
     list_memberships,
     require_role,
@@ -524,6 +526,66 @@ def _invite_link(email: str) -> Optional[str]:
     except Exception:  # noqa: BLE001 — a courtesy that failed, not a failed invite
         logger.exception("could not generate an invite link for %s", email)
         return None
+
+
+class CreateEstateRequest(BaseModel):
+    name: str
+
+
+class EstateSummary(BaseModel):
+    """One estate this caller belongs to, and what they are there."""
+
+    id: str
+    name: str
+    role: str
+    created_at: datetime
+
+
+class MyEstatesResponse(BaseModel):
+    count: int
+    estates: list[EstateSummary]
+
+
+@app.post("/estates", response_model=EstateSummary, status_code=201)
+def post_create_estate(body: CreateEstateRequest, uid: CallerUid) -> EstateSummary:
+    """Start a new estate, with you as its executor.
+
+    **Any signed-in caller, no existing role required** — this is the one write
+    in the API that cannot be gated on membership, because it is what creates
+    the membership. Everything downstream still goes through `require_role`.
+
+    The creator's membership is accepted immediately: there is no invitation to
+    accept when you are the person doing the asking.
+    """
+    try:
+        estate = create_estate(body.name, uid)
+    except MembershipError as exc:
+        raise _conflict(exc) from exc
+    return EstateSummary(
+        id=estate.id, name=estate.name,
+        role=MembershipRole.EXECUTOR.value, created_at=estate.created_at,
+    )
+
+
+@app.get("/me/estates", response_model=MyEstatesResponse)
+def get_my_estates(uid: CallerUid) -> MyEstatesResponse:
+    """Every estate this caller belongs to, oldest first.
+
+    What the frontend routes on after sign-in, replacing the assumption that
+    there is exactly one estate and its id is known at build time. Zero means
+    "you have nowhere to go yet"; that is an ordinary state for a new account,
+    not an error, so it is an empty list rather than a 404.
+
+    Accepted memberships only — a pending invite is not somewhere you can go.
+    """
+    pairs = estates_for_user(uid)
+    return MyEstatesResponse(
+        count=len(pairs),
+        estates=[
+            EstateSummary(id=e.id, name=e.name, role=r.value, created_at=e.created_at)
+            for e, r in pairs
+        ],
+    )
 
 
 @app.post("/estates/{estate_id}/invite", response_model=MembershipResponse)

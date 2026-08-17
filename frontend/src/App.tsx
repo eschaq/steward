@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 
-import { acceptInvite, fetchMe } from './api'
+import { acceptInvite, fetchMe, fetchMyEstates } from './api'
 import { AuthProvider, useAuth } from './auth'
-import { ESTATE_ID } from './firebase'
+import { estateId, setEstateId } from './firebase'
 import type { Me } from './types'
 import { Dashboard } from './screens/Dashboard'
 import { Family } from './screens/Family'
@@ -12,6 +12,7 @@ import { MessageCenter } from './screens/MessageCenter'
 import { ResolveItem } from './screens/ResolveItem'
 import { Review } from './screens/Review'
 import { SignIn } from './screens/SignIn'
+import { CreateEstate } from './screens/CreateEstate'
 import { Welcome } from './screens/Welcome'
 
 /** What happens between signing in and the inventory.
@@ -31,13 +32,34 @@ function Arrival({ children }: { children: React.ReactNode }) {
   const [me, setMe] = useState<Me | null>(null)
   const [checked, setChecked] = useState(false)
   const [welcoming, setWelcoming] = useState(false)
+  // null = still asking; 0 = nowhere to go yet.
+  const [estateCount, setEstateCount] = useState<number | null>(null)
 
   const arrive = useCallback(async () => {
     try {
-      let standing = await fetchMe(ESTATE_ID)
+      // Which estates does this account actually belong to? Everything below
+      // used to assume exactly one, known at build time.
+      const mine = await fetchMyEstates()
+      setEstateCount(mine.count)
+      if (mine.count === 0) {
+        setChecked(true)
+        return
+      }
+      // KNOWN LIMITATION: more than one estate picks the oldest and says so.
+      // There is no estate switcher yet, and guessing further would be worse
+      // than being clear about it.
+      if (mine.count > 1) {
+        console.warn(
+          `[steward] This account belongs to ${mine.count} estates. ` +
+            `Showing "${mine.estates[0].name}" — there is no switcher yet.`,
+        )
+      }
+      setEstateId(mine.estates[0].id)
+
+      let standing = await fetchMe(estateId())
       if (standing.invite_pending) {
-        const accepted = await acceptInvite(ESTATE_ID)
-        standing = await fetchMe(ESTATE_ID)
+        const accepted = await acceptInvite(estateId())
+        standing = await fetchMe(estateId())
         if (accepted.first_accept) setWelcoming(true)
       }
       setMe(standing)
@@ -56,6 +78,20 @@ function Arrival({ children }: { children: React.ReactNode }) {
   // Held rather than flashed: showing the dashboard for a beat and then
   // replacing it with a welcome is worse than a moment of nothing.
   if (!checked) return null
+
+  // A brand-new account, with nowhere to go until it makes somewhere.
+  if (estateCount === 0) {
+    return (
+      <CreateEstate
+        onCreated={(estate) => {
+          setEstateId(estate.id)
+          setEstateCount(1)
+          void arrive()
+        }}
+      />
+    )
+  }
+
   if (welcoming && me) {
     return (
       <Welcome
