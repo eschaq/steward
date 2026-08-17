@@ -2963,3 +2963,104 @@ h3 {
   padding-left: 0;
   padding-right: 0;
 }
+
+/* --- how things have landed ------------------------------------------------
+   Cream, not sage and not clay: this is neither a settled good thing nor
+   something needing attention. It is information, held lightly. No bars, no
+   charts — a bar chart of what people received is a race. */
+
+.landed {
+  margin-top: 26px;
+  background: var(--surface-lowest);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-row);
+  padding: 24px 26px 22px;
+}
+
+.landed .eyebrow {
+  display: block;
+  margin-bottom: 10px;
+}
+
+.landed__intro,
+.landed__empty {
+  margin: 0 0 18px;
+  font-size: 15.5px;
+  line-height: 1.65;
+  color: var(--on-surface-variant);
+  max-width: 64ch;
+}
+
+.landed__empty {
+  margin-bottom: 0;
+}
+
+.landed__people {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--hairline);
+}
+
+.landed__person {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) auto auto;
+  align-items: baseline;
+  gap: 18px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.landed__name {
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--on-surface);
+}
+
+.landed__items {
+  font-size: 15px;
+  color: var(--on-surface-variant);
+}
+
+/* Same weight and size as the item count. Making the money bigger would make
+   the money the point. */
+.landed__value {
+  font-size: 15px;
+  color: var(--on-surface-variant);
+  text-align: right;
+}
+
+.landed__caveat {
+  color: var(--outline);
+  font-size: 13.5px;
+}
+
+.landed__note {
+  margin: 16px 0 0;
+  padding: 13px 16px;
+  background: var(--surface-low);
+  border-radius: var(--r-row);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--on-surface-variant);
+  max-width: 64ch;
+}
+
+.landed__scope {
+  margin: 14px 0 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--outline);
+  max-width: 64ch;
+}
+
+@media (max-width: 560px) {
+  .landed__person {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .landed__value {
+    text-align: left;
+  }
+}

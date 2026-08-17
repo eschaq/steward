@@ -285,6 +285,27 @@ export interface ClarifyResponse {
   messages: Message[]
 }
 
+export interface PersonShare {
+  user_id: string
+  name: string
+  items: number
+  /** Null when none of their items could be valued — never 0, which would say
+   * their things are worthless. */
+  rough_total: number | null
+  unvalued: number
+}
+
+export interface Balance {
+  estate_id: string
+  people: PersonShare[]
+  assigned_items: number
+  valued_items: number
+  /** Sold, donated or let go — didn't come to anybody. */
+  not_to_a_person: number
+  /** Settled without naming a recipient. */
+  unattributed: number
+}
+
 export interface OverrideEntry {
   item_id: string
   item_category: string

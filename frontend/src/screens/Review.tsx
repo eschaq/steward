@@ -1,9 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 
-import { ApiError, fetchMe, fetchOverrideLog, fetchReview, resolveItem } from '../api'
+import {
+  ApiError,
+  fetchBalance,
+  fetchMe,
+  fetchOverrideLog,
+  fetchReview,
+  resolveItem,
+} from '../api'
 import { useAuth } from '../auth'
 import { EstateNav } from '../components/EstateNav'
+import { HowItsLanded } from '../components/HowItsLanded'
 import { LearnedHistory } from '../components/LearnedHistory'
 import { StatusChip } from '../components/StatusChip'
 import { estateId } from '../firebase'
@@ -15,6 +23,7 @@ import {
   type ItemStatus,
   type Me,
   type ResolutionType,
+  type Balance,
   type OverrideLog,
   type ReviewRow,
 } from '../types'
@@ -43,6 +52,7 @@ export function Review() {
   const [me, setMe] = useState<Me | null>(null)
   const [rows, setRows] = useState<ReviewRow[] | null>(null)
   const [log, setLog] = useState<OverrideLog | null>(null)
+  const [balance, setBalance] = useState<Balance | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
@@ -60,6 +70,10 @@ export function Review() {
         ])
         setRows(review.rows)
         setLog(history)
+        // Deliberately not awaited with the others: a first view has to
+        // estimate values it hasn't seen, which takes a while. The table
+        // shouldn't wait behind it.
+        void fetchBalance(estateId()).then(setBalance).catch(() => undefined)
       }
     } catch (error) {
       setProblem(
@@ -139,6 +153,8 @@ export function Review() {
       )}
 
       {!loaded && <p className="notice">Gathering the estate…</p>}
+
+      {loaded && me?.role && <HowItsLanded balance={balance} />}
 
       {loaded && me?.role && <LearnedHistory log={log} />}
 

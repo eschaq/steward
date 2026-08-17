@@ -48,6 +48,7 @@ from dispositions import (
 )
 from marketplace import MarketplaceError, get_listing, listing_id, recommend_channel
 from memories import maybe_invite_memories
+from valuation import ensure_valuation
 from classify import classify_bytes
 from items import (
     ItemError,
@@ -83,6 +84,7 @@ from membership import (
 from models import (
     Claim,
     Disposition,
+    ItemStatus,
     Estate,
     Item,
     MarketplaceListing,
@@ -1001,6 +1003,125 @@ class OverrideLogResponse(BaseModel):
     count: int
     entries: list[OverrideEntry]
     patterns: list[CategoryPattern]
+
+
+class PersonShare(BaseModel):
+    """What has come to one person so far. Never a rank, never a score."""
+
+    user_id: str
+    name: str
+    items: int
+    # Rough total across the items that have an estimate. None when none of
+    # their items could be valued — distinct from 0.0, which would say their
+    # things are worthless.
+    rough_total: Optional[float] = None
+    # How many of their items have no estimate, so the UI can qualify honestly.
+    unvalued: int = 0
+
+
+class BalanceResponse(BaseModel):
+    """How the belongings that went to people have landed so far.
+
+    Deliberately not "fairness". Nothing here is a verdict — the numbers are
+    rough by construction and most of an estate's meaning is not in them.
+    """
+
+    estate_id: str
+    people: list[PersonShare]
+    # Items that went to a person, of which how many carry an estimate.
+    assigned_items: int
+    valued_items: int
+    # Items settled but not to a person — sold, donated, let go. Excluded from
+    # the tally on purpose, and counted so the UI can say so rather than appear
+    # to have lost them.
+    not_to_a_person: int
+    # Resolved without naming anyone (executor_override, outside_appraisal).
+    # These genuinely cannot be attributed, and pretending otherwise would be
+    # inventing a recipient.
+    unattributed: int
+
+
+@app.get("/estates/{estate_id}/balance", response_model=BalanceResponse)
+def get_estate_balance(estate_id: str, uid: CallerUid) -> BalanceResponse:
+    """How things have landed across the family, roughly.
+
+    Any accepted member: who has ended up with what is the family's own
+    business, the same access level as claims and messages. Making it
+    executor-only would turn it into something held over people.
+
+    Only items resolved **to a named person** are counted. An item sold,
+    donated or let go did not come to anybody, and one settled by executor
+    override names no recipient — counting either would require inventing a
+    fact. Both are reported as counts so the view can be honest about what it
+    is leaving out.
+    """
+    try:
+        require_role(uid, estate_id)
+    except MembershipError as exc:
+        raise _forbidden(exc) from exc
+
+    db = get_db()
+    items = {i.id: i for i in list_items_for_estate(estate_id)}
+    settled = [i for i in items.values() if i.status in (ItemStatus.RESOLVED, ItemStatus.ROUTED)]
+
+    resolutions = {}
+    refs = [db.collection(Resolution.COLLECTION).document(f"resolution__{i.id}") for i in settled]
+    for snapshot in db.get_all(refs) if refs else []:
+        if snapshot.exists:
+            r = Resolution.model_validate(snapshot.to_dict())
+            resolutions[r.item_id] = r
+
+    to_person: dict[str, list] = defaultdict(list)
+    unattributed = 0
+    not_to_a_person = 0
+    for item in settled:
+        resolution = resolutions.get(item.id)
+        if resolution is None:
+            unattributed += 1
+            continue
+        if resolution.resolved_to_user_id:
+            to_person[resolution.resolved_to_user_id].append(item)
+        else:
+            # Settled, but not toward anybody in particular.
+            not_to_a_person += 1
+
+    names = display_names_for(list(to_person))
+    people: list[PersonShare] = []
+    valued = 0
+    for user_id, theirs in to_person.items():
+        total = 0.0
+        counted = 0
+        unvalued = 0
+        for item in theirs:
+            estimate = ensure_valuation(item)
+            if estimate.rough_value is None:
+                unvalued += 1
+            else:
+                total += estimate.rough_value
+                counted += 1
+        valued += counted
+        people.append(
+            PersonShare(
+                user_id=user_id,
+                name=names.get(user_id, "someone"),
+                items=len(theirs),
+                rough_total=round(total, 2) if counted else None,
+                unvalued=unvalued,
+            )
+        )
+
+    # By name, never by amount. Sorting by value would make the list a ranking
+    # whatever the copy around it says.
+    people.sort(key=lambda p: p.name.lower())
+
+    return BalanceResponse(
+        estate_id=estate_id,
+        people=people,
+        assigned_items=sum(p.items for p in people),
+        valued_items=valued,
+        not_to_a_person=not_to_a_person,
+        unattributed=unattributed,
+    )
 
 
 @app.get("/estates/{estate_id}/override-log", response_model=OverrideLogResponse)

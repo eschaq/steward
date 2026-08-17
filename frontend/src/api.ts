@@ -7,6 +7,7 @@
 
 import { auth, API_BASE_URL } from './firebase'
 import type {
+  Balance,
   ClarifyResponse,
   ClaimListResponse,
   Item,
@@ -254,6 +255,16 @@ export async function resolveItem(
 /** Every item with its claim count and its decision, in one request. */
 /** What this estate has decided, and the habit Steward reads from it.
  * Any accepted member — it is the family's own history. */
+/** How things have landed across the family. Any accepted member — this is the
+ * family's own information. Slow on a first view: it estimates values it has
+ * not seen before, then caches them. */
+export async function fetchBalance(estateId: string): Promise<Balance> {
+  const response = await authorizedFetch(
+    `/estates/${encodeURIComponent(estateId)}/balance`,
+  )
+  return (await response.json()) as Balance
+}
+
 export async function fetchOverrideLog(estateId: string): Promise<OverrideLog> {
   const response = await authorizedFetch(
     `/estates/${encodeURIComponent(estateId)}/override-log`,

@@ -27,6 +27,7 @@ authentication, which is what Cloud Run serves.
 | `mailer.py`          | The invitation email, over Gmail SMTP. Best-effort, never a gate  |
 | `clarify.py`         | Answering the agent's question, and re-reading the item with it   |
 | `memories.py`        | The third behaviour: noticing when someone has shared a memory    |
+| `valuation.py`       | A rough second-hand value, for items nobody is selling            |
 | `notify.py`          | The two emails a family gets without opening the app              |
 | `init_firestore.py`  | Seeds one document per collection and reads it back             |
 | `seed_demo_items.py` | Demo inventory for the dashboard — **not** a test fixture       |
@@ -283,6 +284,53 @@ one.
 **firestore.rules deliberately does not allow `removed`** in its client-writable
 status list. That rule can only check membership, and removal is executor-only,
 so it has to go through this endpoint where `require_role` can see the role.
+
+### How things have landed
+
+`GET /estates/{id}/balance` — how the belongings that went to *people* have
+spread, roughly. **Any accepted member**, not executor-only: who ended up with
+what is the family's own business, and making it executor-only would turn it
+into something held over people.
+
+**The scoping question, decided on evidence rather than preference.** Only
+`sell_marketplace` items carry a `suggested_price`, and those go to a buyer, not
+a family member. On the seeded estate: 4 items priced, 11 assigned to a person,
+**overlap zero**. Scoping this view to existing pricing data would therefore
+have rendered an empty panel — it answers a question about the items people
+kept, and none of those had a price. So `valuation.py` generates a rough
+estimate for every item that went to someone: one number and one clause, far
+smaller than the marketplace call, cached under `valuation__{item_id}` so only
+the first view pays for it.
+
+**Only items resolved to a named person are counted.** Something sold, donated
+or let go did not come to anybody, and an `executor_override` names no
+recipient. Counting either would require inventing a fact, so both are reported
+as counts instead — the panel says "another 7 were sold, given away or let go"
+rather than quietly dropping them.
+
+**The tone is the specification here**, and it is enforced structurally rather
+than by copy alone:
+
+- **Ordered by name, never by amount** — and sorted server-side, so a careless
+  client change cannot turn it into a league table.
+- **No bars, no charts, no percentages.** A bar chart of what people received is
+  a race. Verified in the browser: zero progress/bar elements.
+- **Items first, value second**, at the same type size. Making the money bigger
+  would make the money the point.
+- **Rounded hard** — nearest 5 below $100, nearest 25 above — because a precise
+  figure invites arithmetic the estimate cannot support.
+- **Null is not zero.** An item with no estimate reads "no estimate yet"; an
+  unvalued chair is not a worthless chair.
+- **No verdict.** Steward never says whether this is fair. When one person's
+  rough total is 3× another's it notes the spread once — *"It may be exactly
+  right — one person may have taken the things nobody else wanted, or the piece
+  that mattered most. It's only here so nobody finds out later."* — and leaves
+  the judgement with the family.
+
+Verified against real data in both states: an even-ish spread (no note), and a
+genuinely uneven one created by resolving real items to real people
+(Claire $55 / Martin $200 / Test Beneficiary $100), where the note fires and
+still reads as an observation rather than an accusation.
 
 ### Noticing a memory
 
