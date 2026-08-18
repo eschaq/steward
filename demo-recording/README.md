@@ -61,6 +61,28 @@ node beat5-marketplace.mjs    # routed to sell: channel, price, draft listing
 node beat6-resolve.mjs        # the clock settled on Eban
 ```
 
+**Beat 7 — the Cloud Console**, which needs a signed-in Google session and so
+comes in two steps:
+
+```bash
+node capture-session.mjs       # opens a real window; sign in by hand, once
+node beat7-cloud-console.mjs   # then this, unattended
+```
+
+Google's sign-in resists automation on purpose, so it is not scripted. The first
+command opens a visible browser with a persistent profile, waits for a person to
+sign in, and saves the session to `.auth/gcloud.json`. The second loads that and
+goes straight to the dashboard. **`.auth/` holds live Google session cookies and
+is gitignored — treat it like a password.**
+
+Two things about the console that cost a take:
+
+- `/run` redirects to an Overview page that truncates service names to
+  "steward-back…". `/run/services` is the list worth filming.
+- Monitoring draws its charts long after the page reports loaded. The first take
+  held on four empty panels reading "0 time series"; the script now waits for
+  that text to *go away* rather than for a duration.
+
 `lib.mjs` holds the rig they share. Masters land in `out/` at 1280x720;
 `out/1080p/` carries the lanczos upscales.
 
