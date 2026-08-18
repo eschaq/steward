@@ -78,6 +78,7 @@ from membership import (
     create_estate,
     delete_empty_estate,
     estates_for_user,
+    pending_invitations_for_user,
     invite_to_estate,
     list_memberships,
     require_role,
@@ -556,8 +557,16 @@ class RemovedEstateResponse(BaseModel):
 
 
 class MyEstatesResponse(BaseModel):
+    # Accepted only, and `count` counts these — the places you can actually go.
+    # Both keep their original meaning: the switcher reads `estates` and must
+    # never offer a door into somewhere you haven't accepted.
     count: int
     estates: list[EstateSummary]
+    # Invitations still waiting on an answer, carried alongside rather than
+    # mixed in. A brand-new invitee has an empty `estates` and a populated
+    # `invitations`, and telling those two apart in one round trip is the whole
+    # reason this field exists — see the arrival sequence in App.tsx.
+    invitations: list[EstateSummary] = []
 
 
 @app.post("/estates", response_model=EstateSummary, status_code=201)
@@ -615,14 +624,29 @@ def get_my_estates(uid: CallerUid) -> MyEstatesResponse:
     "you have nowhere to go yet"; that is an ordinary state for a new account,
     not an error, so it is an empty list rather than a 404.
 
-    Accepted memberships only — a pending invite is not somewhere you can go.
+    `estates` is accepted memberships only — a pending invite is not somewhere
+    you can go. But an invitee has to be able to *find* the invitation before
+    they can accept it, and until this returned `invitations` too, nothing could
+    tell them: `/me/estates` hid pending rows and `GET /me` can only report
+    `invite_pending` for an estate the caller already names. A newly invited
+    account therefore looked identical to an account with nothing — and got sent
+    to "create your own estate" while its real invitation sat unanswered.
+
+    Both facts come back in one call because the caller wants them together: the
+    question being asked on arrival is "where do I belong, and is anyone waiting
+    for an answer from me".
     """
     pairs = estates_for_user(uid)
+    invited = pending_invitations_for_user(uid)
     return MyEstatesResponse(
         count=len(pairs),
         estates=[
             EstateSummary(id=e.id, name=e.name, role=r.value, created_at=e.created_at)
             for e, r in pairs
+        ],
+        invitations=[
+            EstateSummary(id=e.id, name=e.name, role=r.value, created_at=e.created_at)
+            for e, r in invited
         ],
     )
 

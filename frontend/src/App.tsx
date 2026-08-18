@@ -37,31 +37,67 @@ function Arrival({ children }: { children: React.ReactNode }) {
 
   const arrive = useCallback(async () => {
     try {
-      // Which estates does this account actually belong to? Everything below
-      // used to assume exactly one, known at build time.
-      const mine = await fetchMyEstates()
+      // Order matters, and getting it wrong is what broke this once already:
+      //
+      //   1. ask where we belong AND who is waiting on an answer
+      //   2. answer any invitations
+      //   3. only then decide whether there is anywhere to go
+      //
+      // The bug: step 3 ran first and returned early. `/me/estates` counts
+      // *accepted* memberships, so a freshly invited person has zero — they
+      // looked exactly like a brand-new account and were shown "create your own
+      // estate" while a real invitation to a real estate sat unanswered behind
+      // it. The accept step further down was never reached.
+      //
+      // It could not have worked from there anyway: it called fetchMe with
+      // `estateId()`, which for a new invitee is the *fallback* estate, not the
+      // one that invited them. It only ever worked back when there was a single
+      // estate whose id was a build-time constant.
+      let mine = await fetchMyEstates()
+
+      // Accept everything pending, not just the first. Two invitations mean two
+      // families are waiting, and answering one of them is not an answer.
+      if (mine.invitations.length > 0) {
+        let firstTime = false
+        for (const invitation of mine.invitations) {
+          try {
+            // `first_accept` is the server's own answer to "is this the call
+            // that flipped it", so being welcomed once survives a refresh
+            // without anything being stored client-side.
+            const accepted = await acceptInvite(invitation.id)
+            if (accepted.first_accept) firstTime = true
+          } catch {
+            // One invitation that won't accept must not strand the others, or
+            // the estate this person actually uses. Their standing on it is
+            // unchanged, so it will be offered again next time.
+          }
+        }
+        if (firstTime) setWelcoming(true)
+        // Re-ask, because what was pending a moment ago is now somewhere they
+        // belong — and the choice below is made from that list.
+        mine = await fetchMyEstates()
+      }
+
       setEstateCount(mine.count)
       if (mine.count === 0) {
         setChecked(true)
         return
       }
+
       // Whichever estate was last chosen, if it is still one this account
       // belongs to — otherwise the oldest. This used to unconditionally take
       // the oldest, which is what made a switcher impossible: every reload
       // silently undid the choice. Membership is re-checked here rather than
       // trusted from localStorage, so an estate someone was removed from
       // cannot be pinned open by a stale browser.
+      //
+      // A person who just accepted their first invitation has no stored estate,
+      // so this lands them on the one that invited them.
       const stored = estateId()
       const chosen = mine.estates.find((e) => e.id === stored) ?? mine.estates[0]
       setEstateId(chosen.id)
 
-      let standing = await fetchMe(estateId())
-      if (standing.invite_pending) {
-        const accepted = await acceptInvite(estateId())
-        standing = await fetchMe(estateId())
-        if (accepted.first_accept) setWelcoming(true)
-      }
-      setMe(standing)
+      setMe(await fetchMe(chosen.id))
     } catch {
       // A failure here is not worth a wall in front of the app: the screens
       // each ask for their own standing and say plainly what they find.

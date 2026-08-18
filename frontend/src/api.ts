@@ -171,12 +171,22 @@ export interface EstateSummary {
 /** Every estate this account belongs to. What the app routes on after sign-in,
  * replacing the assumption that there is exactly one and its id is known at
  * build time. */
-export async function fetchMyEstates(): Promise<{
+export interface MyEstates {
+  /** Accepted memberships only — the places you can actually go. */
   count: number
   estates: EstateSummary[]
-}> {
+  /** Invitations still waiting on an answer. Empty for almost everyone, and the
+   * whole of what a newly invited account has: `estates` is [] until these are
+   * accepted, which is exactly why they cannot be told apart without this. */
+  invitations: EstateSummary[]
+}
+
+export async function fetchMyEstates(): Promise<MyEstates> {
   const response = await authorizedFetch('/me/estates')
-  return (await response.json()) as { count: number; estates: EstateSummary[] }
+  const body = (await response.json()) as MyEstates
+  // Defensive: a backend that predates the invitations field would otherwise
+  // make the arrival sequence throw on `.length` rather than simply find none.
+  return { ...body, invitations: body.invitations ?? [] }
 }
 
 export async function createEstate(name: string): Promise<EstateSummary> {

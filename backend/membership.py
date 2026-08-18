@@ -296,6 +296,44 @@ def estates_for_user(user_id: str) -> list[tuple[Estate, MembershipRole]]:
     return sorted(pairs, key=lambda pair: pair[0].created_at)
 
 
+def pending_invitations_for_user(user_id: str) -> list[tuple[Estate, MembershipRole]]:
+    """Estates this person has been asked into but has not accepted yet.
+
+    The exact complement of `estates_for_user`, and it exists because nothing
+    else could answer the question. `/me/estates` returns accepted memberships
+    only — correctly, since a pending invite is not somewhere you can go — and
+    `GET /me` can only report `invite_pending` for an estate *you already name*.
+    So a browser holding a freshly invited account had no way to find out which
+    estate had invited it, and an invitation nobody can discover is an
+    invitation nobody can accept.
+
+    Ordered by when the invitation was sent: if two arrived, the first one asked
+    is the first one answered.
+    """
+    db = get_db()
+    snapshots = (
+        db.collection(EstateMembership.COLLECTION)
+        .where(filter=gcf.FieldFilter("user_id", "==", user_id))
+        .get()
+    )
+    memberships = [EstateMembership.model_validate(s.to_dict()) for s in snapshots]
+    pending = sorted(
+        (m for m in memberships if m.accepted_at is None),
+        key=lambda m: m.invited_at,
+    )
+    if not pending:
+        return []
+
+    refs = [db.collection(Estate.COLLECTION).document(m.estate_id) for m in pending]
+    estates = {
+        s.id: Estate.model_validate(s.to_dict()) for s in db.get_all(refs) if s.exists
+    }
+    # An invitation to an estate that has since been removed is not an
+    # invitation — dropped rather than reported, so nothing offers a door into
+    # something that isn't there.
+    return [(estates[m.estate_id], m.role) for m in pending if m.estate_id in estates]
+
+
 def invite_to_estate(
     estate_id: str, email: str, role: MembershipRole
 ) -> EstateMembership:
