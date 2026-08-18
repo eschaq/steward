@@ -77,6 +77,7 @@ from membership import (
     create_auth_user,
     create_estate,
     delete_empty_estate,
+    ensure_user_document,
     estates_for_user,
     pending_invitations_for_user,
     invite_to_estate,
@@ -713,6 +714,17 @@ def post_accept(estate_id: str, uid: CallerUid) -> MembershipResponse:
     is already answerable from `accepted_at` being null. Accepting is
     idempotent, so every later call reports False.
     """
+    # Make sure this person exists in `users` before they become visible to the
+    # rest of the family. Every name the app shows — the family list, message
+    # authors, who claimed what — is read from that document, and without one
+    # they render as "Someone" to everybody, permanently.
+    #
+    # The invite path already writes it (`create_auth_user`), so this is a
+    # backstop rather than the main road: it covers anyone who arrived by a
+    # route that didn't, and it costs one read when the document is already
+    # there. Idempotent, and it never overwrites an existing name.
+    ensure_user_document(uid)
+
     before = get_membership(estate_id, uid)
     try:
         membership = accept_invite(estate_id, uid)
