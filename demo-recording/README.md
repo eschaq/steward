@@ -50,12 +50,43 @@ belongings.
 - **`page.type()` with a delay, not `page.fill()`.** Fill sets the value in one
   step; on camera the field simply blinks from empty to full.
 
+## The six demo beats
+
+```bash
+node beat1-mediation.mjs      # contested clock, Steward's way through
+node beat2-clarify.mjs        # an unplaced photo, answered, reclassified
+node beat3-memory.mjs         # a memory posted, Steward asks for another
+node beat4-learning.mjs       # four chairs decided, then what it learned
+node beat5-marketplace.mjs    # routed to sell: channel, price, draft listing
+node beat6-resolve.mjs        # the clock settled on Eban
+```
+
+`lib.mjs` holds the rig they share. Masters land in `out/` at 1280x720;
+`out/1080p/` carries the lanczos upscales.
+
+**Order matters, and the beats are not idempotent.** Each performs real writes
+against the live estate: beat 2 reclassifies the item it clarifies, beat 3's
+invitation is once-per-item forever, beat 6 settles the clock that beat 1 shows
+contested. Re-shooting means putting that state back first — reverting the
+resolution, resetting the item to `needs_clarification`, deleting the thread.
+
+**Two staging facts about Eleanor's House**, both discovered the hard way:
+
+- The executor also belongs to the seeded estate, and arrival picks whichever
+  was last chosen. Every beat pins the estate in localStorage before any page
+  script runs.
+- A disposition can only be recorded on a *resolved* item, and `resolve_item`
+  refuses one nobody has claimed. Beats 4 and 5 needed a claim on each chair and
+  the lamp before there was any path to the decision they record.
+
 ## Two things to sort before shooting the real thing
 
-- **1920 is wider than the app is.** The layout is a centred 1120px column, so a
-  1920-wide capture spends 800px on empty cream. Worth testing a 1280×720
-  viewport recorded at 1920×1080 — an exact 1.5× scale, same aspect, no
-  letterboxing, and the content fills the frame.
+- ~~**1920 is wider than the app is.**~~ **Settled, and the fix was not the one
+  guessed here.** A 1280×720 viewport recorded at 1920×1080 does *not* scale up
+  1.5×: Playwright pins the page to the top-left of the larger canvas and greys
+  the rest. `recordVideo.size` must equal the viewport. The beats capture 1:1 at
+  1280×720 and upscale to 1080p with ffmpeg afterwards, which is where scaling
+  belonged anyway.
 - **The seeded production items have no photographs.** Every card in the smoke
   recording reads NO PHOTO YET, which is the honest state of the data and a poor
   look on camera. Worth adding photos to the handful of items the demo actually
