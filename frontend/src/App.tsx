@@ -40,6 +40,9 @@ function Arrival({ children }: { children: React.ReactNode }) {
   const [refusedInvites, setRefusedInvites] = useState<string[]>([])
 
   const arrive = useCallback(async () => {
+    // Local rather than state: `welcoming` is set asynchronously and would not
+    // be readable later in this same run.
+    let welcomeNeeded = false
     try {
       // Order matters, and getting it wrong is what broke this once already:
       //
@@ -85,6 +88,7 @@ function Arrival({ children }: { children: React.ReactNode }) {
             )
           }
         }
+        welcomeNeeded = firstTime
         if (firstTime) setWelcoming(true)
         setRefusedInvites(refused)
         // Re-ask, because what was pending a moment ago is now somewhere they
@@ -111,7 +115,13 @@ function Arrival({ children }: { children: React.ReactNode }) {
       const chosen = mine.estates.find((e) => e.id === stored) ?? mine.estates[0]
       setEstateId(chosen.id)
 
-      setMe(await fetchMe(chosen.id))
+      // `me` is only read by the welcome, so it is only fetched when there is
+      // going to be one. Asking for it on every sign-in cost a round trip that
+      // nothing used, and — worse — it sat *between* choosing the estate and
+      // the dashboard being allowed to load, so everyone waited for it.
+      // Measured at ~500ms of the ~2.9s sign-in. The dashboard asks for its own
+      // standing anyway.
+      if (welcomeNeeded) setMe(await fetchMe(chosen.id))
     } catch {
       // A failure here is not worth a wall in front of the app: the screens
       // each ask for their own standing and say plainly what they find.
