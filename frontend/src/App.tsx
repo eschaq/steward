@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 
-import { acceptInvite, fetchMe, fetchMyEstates } from './api'
+import { ApiError, acceptInvite, fetchMe, fetchMyEstates } from './api'
 import { AuthProvider, useAuth } from './auth'
 import { estateId, setEstateId } from './firebase'
 import type { Me } from './types'
@@ -34,6 +34,10 @@ function Arrival({ children }: { children: React.ReactNode }) {
   const [welcoming, setWelcoming] = useState(false)
   // null = still asking; 0 = nowhere to go yet.
   const [estateCount, setEstateCount] = useState<number | null>(null)
+  // Invitations that were found but could not be accepted. Never silent: see
+  // the catch below for why this is the difference between a bug and a screen
+  // that quietly lies about what exists.
+  const [refusedInvites, setRefusedInvites] = useState<string[]>([])
 
   const arrive = useCallback(async () => {
     try {
@@ -59,6 +63,7 @@ function Arrival({ children }: { children: React.ReactNode }) {
       // families are waiting, and answering one of them is not an answer.
       if (mine.invitations.length > 0) {
         let firstTime = false
+        const refused: string[] = []
         for (const invitation of mine.invitations) {
           try {
             // `first_accept` is the server's own answer to "is this the call
@@ -66,13 +71,22 @@ function Arrival({ children }: { children: React.ReactNode }) {
             // without anything being stored client-side.
             const accepted = await acceptInvite(invitation.id)
             if (accepted.first_accept) firstTime = true
-          } catch {
+          } catch (error) {
             // One invitation that won't accept must not strand the others, or
-            // the estate this person actually uses. Their standing on it is
-            // unchanged, so it will be offered again next time.
+            // the estate this person actually uses — but it must not vanish
+            // either. Swallowed, a failed acceptance looks exactly like having
+            // no invitation at all, and the person is sent to "create your own
+            // estate" over the top of a real one. That is the same wrong screen
+            // this whole fix exists to stop showing, arrived at a different way.
+            refused.push(
+              `${invitation.name}: ${
+                error instanceof ApiError ? error.message : String(error)
+              }`,
+            )
           }
         }
         if (firstTime) setWelcoming(true)
+        setRefusedInvites(refused)
         // Re-ask, because what was pending a moment ago is now somewhere they
         // belong — and the choice below is made from that list.
         mine = await fetchMyEstates()
@@ -113,6 +127,28 @@ function Arrival({ children }: { children: React.ReactNode }) {
   // Held rather than flashed: showing the dashboard for a beat and then
   // replacing it with a welcome is worse than a moment of nothing.
   if (!checked) return null
+
+  // An invitation was there and would not be accepted. Say so plainly rather
+  // than offering to start an estate over the top of one they already belong
+  // to — "nothing here yet" would be a straightforward untruth.
+  if (estateCount === 0 && refusedInvites.length > 0) {
+    return (
+      <main className="page">
+        <p className="notice notice--problem" role="alert">
+          <span>
+            You've been invited to {refusedInvites.length === 1 ? 'an estate' : 'estates'},
+            but Steward couldn't accept{' '}
+            {refusedInvites.length === 1 ? 'it' : 'them'} just now — so this
+            isn't a new start, it's something that needs another go.{' '}
+            {refusedInvites.join(' · ')}
+          </span>
+          <button className="button button--sage" type="button" onClick={() => void arrive()}>
+            Try again
+          </button>
+        </p>
+      </main>
+    )
+  }
 
   // A brand-new account, with nowhere to go until it makes somewhere.
   if (estateCount === 0) {
