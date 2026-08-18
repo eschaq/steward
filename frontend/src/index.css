@@ -1286,6 +1286,138 @@ h3 {
   border-bottom-color: var(--ink-accent);
 }
 
+/* --- the estate switcher ---------------------------------------------------
+   Sits on the estate name in the hero, so the name is both where you are and
+   how you go elsewhere. No shadow, per DESIGN.md — the panel separates from the
+   hero by going a shade *darker* than it (ink-deep on ink) with a 1px hairline,
+   which is the same tonal layering the rest of the system uses. */
+.switcher {
+  position: relative;
+  display: inline-block;
+}
+
+.switcher__current {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: none;
+  border: 0;
+  padding: 2px 0;
+  cursor: pointer;
+  /* WCAG 2.5.8: the estate name alone is 15px tall. */
+  min-height: 24px;
+}
+
+.switcher__current:hover {
+  color: var(--on-ink);
+}
+
+.switcher__caret {
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg) translate(-2px, -2px);
+  transition: transform 150ms ease;
+}
+
+.switcher__current[aria-expanded='true'] .switcher__caret {
+  transform: rotate(-135deg) translate(-2px, -2px);
+}
+
+/* Fixed, not absolute: `.hero` is `overflow: hidden` so it can clip the gable
+   photograph, and an absolutely-positioned panel would be cut off at its edge.
+   Positioned by the flow of the inline-block above it — the hero sets no
+   transform, so fixed still resolves against the viewport at this spot. */
+.switcher__panel {
+  position: fixed;
+  margin-top: 6px;
+  min-width: 262px;
+  max-width: min(340px, calc(100vw - 48px));
+  background: var(--ink-deep);
+  border: 1px solid var(--ink-hairline);
+  border-radius: var(--r-row);
+  padding: 8px;
+  z-index: 20;
+}
+
+.switcher__head {
+  margin: 0;
+  padding: 6px 10px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--on-ink-faint);
+}
+
+.switcher__quiet,
+.switcher__problem {
+  margin: 0;
+  padding: 4px 10px 10px;
+  font-size: 14px;
+  color: var(--on-ink-muted);
+}
+
+.switcher__estate,
+.switcher__new {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: 10px;
+  padding: 9px 10px;
+  cursor: pointer;
+  color: var(--on-ink);
+  font: inherit;
+}
+
+.switcher__estate:hover,
+.switcher__new:hover {
+  background: rgba(249, 239, 232, 0.07);
+}
+
+/* The one you are in is marked, not hidden — a switcher that omits the current
+   estate makes the list change shape every time you use it. */
+.switcher__estate[aria-current='true'] .switcher__name {
+  color: var(--ink-accent);
+}
+
+.switcher__name {
+  display: block;
+  font-family: var(--serif);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.switcher__role {
+  display: block;
+  margin-top: 1px;
+  font-size: 13px;
+  color: var(--on-ink-muted);
+}
+
+.switcher__new {
+  margin-top: 4px;
+  border-top: 1px solid var(--ink-hairline);
+  border-radius: 0 0 10px 10px;
+  padding-top: 12px;
+  font-size: 14.5px;
+  color: var(--on-ink-muted);
+}
+
+.switcher__new:hover {
+  color: var(--on-ink);
+}
+
+/* The way out of starting another estate. Quiet, under the action it declines. */
+.create-estate__back {
+  margin-top: 14px;
+  align-self: flex-start;
+}
+
 /* --- compose -------------------------------------------------------------- */
 
 .compose {

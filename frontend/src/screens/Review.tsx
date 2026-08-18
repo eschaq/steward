@@ -11,6 +11,7 @@ import {
 } from '../api'
 import { useAuth } from '../auth'
 import { EstateNav } from '../components/EstateNav'
+import { EstateSwitcher } from '../components/EstateSwitcher'
 import { HowItsLanded } from '../components/HowItsLanded'
 import { LearnedHistory } from '../components/LearnedHistory'
 import { DEFAULT_TAB, ReviewTabs, isReviewTab, type ReviewTab } from '../components/ReviewTabs'
@@ -195,7 +196,7 @@ export function Review() {
           </div>
         </div>
         <div>
-          <div className="eyebrow eyebrow--on-ink">{me?.estate_name ?? estateId()}</div>
+          <EstateSwitcher name={me?.estate_name ?? estateId()} />
           <h1 className="display hero__title">Review</h1>
         </div>
       </header>

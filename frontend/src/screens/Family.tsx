@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { ApiError, fetchMe, fetchMembers, inviteToEstate } from '../api'
 import { useAuth } from '../auth'
 import { EstateNav } from '../components/EstateNav'
+import { EstateSwitcher } from '../components/EstateSwitcher'
 import { estateId } from '../firebase'
 import { ROLE_HELP, ROLE_LABEL, type Me, type Member } from '../types'
 
@@ -119,7 +120,7 @@ export function Family() {
           </div>
         </div>
         <div>
-          <div className="eyebrow eyebrow--on-ink">{me?.estate_name ?? estateId()}</div>
+          <EstateSwitcher name={me?.estate_name ?? estateId()} />
           <h1 className="display hero__title">Family</h1>
         </div>
       </header>

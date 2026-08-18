@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { ApiError, fetchEstateMessages, fetchMe, postEstateMessage } from '../api'
 import { useAuth } from '../auth'
 import { EstateNav } from '../components/EstateNav'
+import { EstateSwitcher } from '../components/EstateSwitcher'
 import { MessageThread } from '../components/MessageThread'
 import { estateId } from '../firebase'
 import type { Me, Message } from '../types'
@@ -85,7 +86,7 @@ export function MessageCenter() {
           </div>
         </div>
         <div>
-          <div className="eyebrow eyebrow--on-ink">{me?.estate_name ?? estateId()}</div>
+          <EstateSwitcher name={me?.estate_name ?? estateId()} />
           <h1 className="display hero__title">Messages</h1>
         </div>
       </header>

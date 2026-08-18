@@ -77,6 +77,7 @@ the final call is theirs to record and that Steward suggests but doesn't decide.
 | `/review/landed`  | How things have landed | Any member: roughly what has gone to whom. |
 | `/review/learned` | What Steward has learned | Any member: the estate's decisions and the habit read from them. |
 | `/family`         | Family         | Who's here and who's still waiting; the executor can ask someone new in. |
+| `/estates/new`    | Start another estate | The creation screen, reached deliberately from the switcher rather than by having nowhere else to be. |
 
 All six are wired to the real backend against real Firestore. There is no mock
 data anywhere in here.

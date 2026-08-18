@@ -5,7 +5,8 @@ import { useAuth } from '../auth'
 import { StewardMark } from '../components/StewardMark'
 import type { EstateSummary } from '../api'
 
-/** Where someone lands when they have no estate yet.
+/** Where someone lands when they have no estate yet — and where they come back
+ * to when they need a second one.
  *
  * One field. Not a setup wizard — a person arrives here shortly after a death,
  * and asking them to configure anything would be the wrong first thing to do.
@@ -13,8 +14,21 @@ import type { EstateSummary } from '../api'
  *
  * On Ink, like sign-in and the welcome: DESIGN.md keeps the dark surface for
  * arrival moments, and this is one.
+ *
+ * The same form serves both cases, with only the framing above it different.
+ * "Nothing here yet" is true exactly once; saying it to someone who already has
+ * an estate open would be a small lie, and the way out has to exist for them —
+ * arriving with nothing, there is nowhere to go back to.
  */
-export function CreateEstate({ onCreated }: { onCreated: (estate: EstateSummary) => void }) {
+export function CreateEstate({
+  onCreated,
+  another = false,
+  onCancel,
+}: {
+  onCreated: (estate: EstateSummary) => void
+  another?: boolean
+  onCancel?: () => void
+}) {
   const { user, leave } = useAuth()
   const [name, setName] = useState('')
   const [working, setWorking] = useState(false)
@@ -46,11 +60,14 @@ export function CreateEstate({ onCreated }: { onCreated: (estate: EstateSummary)
         </header>
 
         <div className="welcome__body">
-          <span className="eyebrow eyebrow--on-ink">Nothing here yet</span>
+          <span className="eyebrow eyebrow--on-ink">
+            {another ? 'Another estate' : 'Nothing here yet'}
+          </span>
           <h1 className="welcome__title">What should we call it?</h1>
           <p className="welcome__text">
             A name for the estate you're looking after — most people use the
             house, or whose it was. You can change it later.
+            {another && ' The one you have open stays exactly as it is.'}
           </p>
 
           <form className="create-estate" onSubmit={onSubmit}>
@@ -82,6 +99,17 @@ export function CreateEstate({ onCreated }: { onCreated: (estate: EstateSummary)
             >
               {working ? 'Setting it up…' : 'Start here'}
             </button>
+
+            {onCancel && (
+              <button
+                className="welcome__skip create-estate__back"
+                type="button"
+                onClick={onCancel}
+                disabled={working}
+              >
+                Never mind, go back
+              </button>
+            )}
           </form>
         </div>
 

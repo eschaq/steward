@@ -8,6 +8,7 @@ import { AddItem } from '../components/AddItem'
 import { ItemCard } from '../components/ItemCard'
 import { StatusFilters, type Filter } from '../components/StatusFilters'
 import { EstateNav } from '../components/EstateNav'
+import { EstateSwitcher } from '../components/EstateSwitcher'
 import {
   ITEM_STATUSES,
   STATUS_LABEL,
@@ -108,7 +109,7 @@ export function Dashboard() {
         </div>
 
         <div>
-          <div className="eyebrow eyebrow--on-ink">{me?.estate_name ?? estateId()}</div>
+          <EstateSwitcher name={me?.estate_name ?? estateId()} />
           <h1 className="display hero__title">Inventory</h1>
         </div>
 

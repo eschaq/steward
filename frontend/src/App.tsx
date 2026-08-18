@@ -45,16 +45,15 @@ function Arrival({ children }: { children: React.ReactNode }) {
         setChecked(true)
         return
       }
-      // KNOWN LIMITATION: more than one estate picks the oldest and says so.
-      // There is no estate switcher yet, and guessing further would be worse
-      // than being clear about it.
-      if (mine.count > 1) {
-        console.warn(
-          `[steward] This account belongs to ${mine.count} estates. ` +
-            `Showing "${mine.estates[0].name}" — there is no switcher yet.`,
-        )
-      }
-      setEstateId(mine.estates[0].id)
+      // Whichever estate was last chosen, if it is still one this account
+      // belongs to — otherwise the oldest. This used to unconditionally take
+      // the oldest, which is what made a switcher impossible: every reload
+      // silently undid the choice. Membership is re-checked here rather than
+      // trusted from localStorage, so an estate someone was removed from
+      // cannot be pinned open by a stale browser.
+      const stored = estateId()
+      const chosen = mine.estates.find((e) => e.id === stored) ?? mine.estates[0]
+      setEstateId(chosen.id)
 
       let standing = await fetchMe(estateId())
       if (standing.invite_pending) {
@@ -106,6 +105,29 @@ function Arrival({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+/** Starting a second estate, from inside the first.
+ *
+ * The same screen `<Arrival>` shows an account with nothing, reached
+ * deliberately instead of by having nowhere else to be — so it says "another
+ * estate" and offers a way back.
+ *
+ * Lands in the new estate on a full load, for the reason the switcher does:
+ * every mounted screen is holding the previous estate's data.
+ */
+function NewEstate() {
+  const navigate = useNavigate()
+  return (
+    <CreateEstate
+      another
+      onCancel={() => navigate(-1)}
+      onCreated={(estate) => {
+        setEstateId(estate.id)
+        window.location.assign('/')
+      }}
+    />
+  )
+}
+
 /** Signed out, there is one screen and it isn't addressable. Signed in, items
  * have real URLs — a contested piece is a thing a family will send each other a
  * link to. */
@@ -129,6 +151,7 @@ function Routed() {
       <Route path="/review" element={<Navigate to="/review/inventory" replace />} />
       <Route path="/review/:tab" element={<Review />} />
       <Route path="/family" element={<Family />} />
+      <Route path="/estates/new" element={<NewEstate />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
     </Arrival>
