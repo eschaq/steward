@@ -43,6 +43,18 @@ A multi-user agent that:
 - Donation receipt/tax-value documentation
 - Payment/commission handling of any kind
 
+*Added during the build, after the 2026-08-10 draft — surfaced by the work
+itself, not part of the original Tier 1-3 scoping. **All three were built**, so
+this list is a record of how the scope actually moved, not a backlog:*
+- New-user onboarding flow — guiding a first-time executor or beneficiary through invite acceptance and the claim/contest/resolve workflow (gap became clear during frontend work; the app assumed you already knew what it was). **Built** — the invite is accepted on arrival and a first-time member is shown around once, off the server's `first_accept`.
+- Shared-memories agent behavior — a third agent behavior, beyond clarifying questions and contested mediation, prompting family members to share memories or stories about an item when someone comments on it (surfaced during Stitch mockup exploration). **Built** — `backend/memories.py`, once per item, and deliberately outside the ADK status-transition dispatch because the judgement *is* the model call.
+- Executor bulk table view — all items in one table with disposition info and inline override, so the executor can move through review quickly rather than item-by-item. **Built** — the Review screen, now three subtabs with their own URLs.
+
+*Also added, and not in the original scoping:* self-serve sign-up, several
+estates per account with a switcher, and removing an estate that was never used.
+The last one only ever applies to an estate with nothing in it — see the data
+model note on `EstateStatus`.
+
 ## Target User (Audience Sharpening Test)
 
 ❌ "Executors" — one modifier, still a category

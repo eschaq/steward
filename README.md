@@ -12,7 +12,7 @@ Cloud Run services: a static frontend and a backend API that hosts the agent log
 
 | Path        | Purpose                                                        |
 | ----------- | -------------------------------------------------------------- |
-| `frontend/` | Static build, deployed as a Cloud Run service. *(placeholder)*  |
+| `frontend/` | React + Vite app — every signed-in screen. See `frontend/README.md`. |
 | `backend/`  | API + ADK agent logic, deployed as a Cloud Run service. See `backend/README.md`. |
 | `docs/`     | Planning and design documents.                                  |
 | `firestore.rules` | Firestore Security Rules — see below.                     |
@@ -20,37 +20,58 @@ Cloud Run services: a static frontend and a backend API that hosts the agent log
 
 ## Setup
 
-> **Placeholder** — these steps are stubs to be filled in once the services exist.
-
 ### Prerequisites
 
-- [ ] Node version — TBD
-- [ ] Python version — TBD
-- [ ] `gcloud` CLI, authenticated against the project — project ID TBD
-- [ ] Firebase project / credentials — TBD
+- Python 3.11, Node 20
+- `gcloud` CLI authenticated against `steward-hackathon-505217`
+- Application Default Credentials — Firestore, Auth, and Vertex AI all use them:
+  ```bash
+  gcloud auth application-default login
+  gcloud auth application-default set-quota-project steward-hackathon-505217
+  ```
+- JDK 21+ only if you're running the Security Rules tests
 
 ### Local development
 
+Two terminals.
+
 ```bash
-# 1. Clone
-git clone <repo-url> && cd steward
-
-# 2. Frontend — install and run dev server
-# TBD
-
-# 3. Backend — create virtualenv, install deps, run API locally
-# TBD
-
-# 4. Environment variables — copy the example file and fill in values
-# TBD
+# Backend — http://localhost:8000
+cd backend
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/python init_firestore.py          # once, seeds one doc per collection
+.venv/bin/uvicorn api:app --reload --port 8000
 ```
+
+```bash
+# Frontend — http://localhost:5173
+cd frontend
+npm install
+cp .env.example .env.local                  # fill in with:
+                                            #   firebase apps:sdkconfig WEB \
+                                            #     --project steward-hackathon-505217
+npm run dev
+```
+
+Sign in as a seeded test user, e.g. `steward-test-executor@example.com`. See
+`backend/README.md` for how the test accounts and their passwords are set up.
+
+The backend allows CORS from `localhost:5173` by default; set
+`STEWARD_ALLOWED_ORIGINS` (comma-separated) when the frontend moves elsewhere.
 
 ### Deploy
 
-```bash
-# Build and deploy each service to Cloud Run
-# TBD
-```
+Both services are live on Cloud Run in `us-central1`, and the Security Rules are
+deployed to production:
+
+- frontend — https://steward-frontend-223877730603.us-central1.run.app
+- backend — https://steward-backend-223877730603.us-central1.run.app (probe
+  `/health`; Cloud Run's own frontend swallows `/healthz`)
+
+Every `VITE_*` value is baked in at **build** time, so the frontend's config is a
+set of Docker build args rather than Cloud Run environment variables — see
+`frontend/README.md`. Backend secrets live in Secret Manager. Rules go up with
+`firebase deploy --only firestore:rules`.
 
 ## Firestore Security Rules
 
@@ -108,9 +129,15 @@ decision.
 
 ## Status
 
-Backend is built and verified end-to-end against real Firestore: the Tier 1
-entities, the two agent behaviors, the adaptive suggestion loop, an ADK agent
-layer, and a minimal FastAPI app. Frontend is still a placeholder.
+**Tier 1 is complete, Tier 2 is built, and both services are deployed.** The
+backend carries every Tier 1 entity, three agent behaviours (clarifying
+questions, contested-item mediation, and noticing a shared memory), the adaptive
+suggestion loop, an ADK layer and an authenticated FastAPI app, all verified
+end-to-end against real Firestore. The frontend runs the whole arc against that
+API — sign-in and self-serve sign-up, the inventory, item detail, the Message
+Center, contested resolution, Review, and Family — with no mock data anywhere.
+Tier 2 adds a marketplace listing draft per item. Tier 3 (bulk auction batching)
+remains deliberately out of scope.
 
 ## License
 

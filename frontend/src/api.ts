@@ -187,6 +187,17 @@ export async function createEstate(name: string): Promise<EstateSummary> {
   return (await response.json()) as EstateSummary
 }
 
+/** Remove an estate that never had anything in it. Executor-only, and the
+ * backend refuses — naming what it found — the moment there is anything to
+ * lose. The name comes back because the UI has to say it after the estate it
+ * would have read it from is gone. */
+export async function deleteEstate(estateId: string): Promise<{ id: string; name: string }> {
+  const response = await authorizedFetch(`/estates/${encodeURIComponent(estateId)}`, {
+    method: 'DELETE',
+  })
+  return (await response.json()) as { id: string; name: string }
+}
+
 export async function fetchMe(estateId: string): Promise<Me> {
   const response = await authorizedFetch(`/estates/${encodeURIComponent(estateId)}/me`)
   return (await response.json()) as Me

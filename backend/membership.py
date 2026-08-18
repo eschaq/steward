@@ -175,6 +175,94 @@ def create_estate(name: str, executor_user_id: str) -> Estate:
     return estate
 
 
+def delete_empty_estate(estate_id: str, executor_user_id: str) -> Estate:
+    """Remove an estate that never had anything in it. Refuses otherwise.
+
+    **Why deleting and not `status: closed`.** The data model has both, and they
+    answer different questions. `closed` is for an estate whose work is *done* —
+    it happened, it has a history, and that history is exactly what a family
+    might need to look at in two years. This is for the other case: an estate
+    made by mistake, or to try something out, which never held anything at all.
+    Marking those closed would leave a permanent list of a person's typos in
+    their own switcher.
+
+    **Empty means empty**, and every one of these is checked rather than assumed:
+
+      - no items, *including* soft-removed ones. `removed` items are still real
+        records with claims and messages hanging off them, and the whole point
+        of that status is that nothing is destroyed.
+      - no messages. `Message.item_id` is nullable by design, so an estate with
+        no items can still hold a conversation, and that conversation is
+        somebody's words.
+      - nobody else invited — not accepted, not pending. A pending invite means
+        an email went out; deleting from under it would leave a live link to
+        nothing.
+
+    Anything found is reported by name in the refusal, because "cannot delete"
+    without saying what is in there is the kind of message that makes a person
+    delete the wrong thing next time.
+
+    What gets removed is only ever two documents: the estate and the caller's own
+    executor membership. Everything else that could reference an estate hangs off
+    an Item, and there are none — so there is nothing here that can orphan a
+    record. Not a cascade, and deliberately not written as one: a cascade would
+    quietly grow teeth the first time somebody relaxed the emptiness check.
+    """
+    db = get_db()
+    estate_ref = db.collection(Estate.COLLECTION).document(estate_id)
+    snapshot = estate_ref.get()
+    if not snapshot.exists:
+        raise MembershipError(f"No estate {estate_id} to remove.")
+    estate = Estate.model_validate(snapshot.to_dict())
+
+    # Deferred: importing at module scope would make membership.py depend on
+    # models it otherwise has no use for, and this is the only caller.
+    from models import Item, Message
+
+    def _count(collection: str, limit: int = 1) -> int:
+        return len(
+            db.collection(collection)
+            .where(filter=gcf.FieldFilter("estate_id", "==", estate_id))
+            .limit(limit)
+            .get()
+        )
+
+    blocking: list[str] = []
+    if _count(Item.COLLECTION):
+        blocking.append("belongings in it")
+    if _count(Message.COLLECTION):
+        blocking.append("messages in it")
+
+    others = [
+        m
+        for m in list_memberships(estate_id)
+        if m.user_id != executor_user_id
+    ]
+    if others:
+        pending = sum(1 for m in others if m.accepted_at is None)
+        blocking.append(
+            f"{len(others)} other {'person' if len(others) == 1 else 'people'}"
+            + (f" ({pending} still invited)" if pending else "")
+        )
+
+    if blocking:
+        raise MembershipError(
+            f'"{estate.name}" has ' + ", and ".join(blocking) + ". "
+            "Steward only removes an estate that never had anything in it — "
+            "nothing here gets deleted out from under a family."
+        )
+
+    batch = db.batch()
+    batch.delete(estate_ref)
+    batch.delete(
+        db.collection(EstateMembership.COLLECTION).document(
+            membership_id(estate_id, executor_user_id)
+        )
+    )
+    batch.commit()
+    return estate
+
+
 def estates_for_user(user_id: str) -> list[tuple[Estate, MembershipRole]]:
     """Every estate this person belongs to, with the role they hold there.
 

@@ -14,6 +14,14 @@ Design principle: Tier 1 (core) entities never change shape when Tier 2/3 are ad
 - status: active | closed
 - created_at
 
+*`closed` is defined and **currently unused**: no code path sets it. It is for an
+estate whose work is finished, which keeps its history. Separately, an estate can
+be **hard-deleted** — but only while genuinely empty: no items (including
+`removed` ones), no messages, and nobody invited beyond its creator. That is for
+the estate made by mistake, which has no history to keep. The check is in
+`membership.delete_empty_estate`, and the two cases are deliberately not merged:
+one preserves a record, the other exists because there is no record to preserve.*
+
 **User**
 - id (PK)
 - email
@@ -38,8 +46,19 @@ Design principle: Tier 1 (core) entities never change shape when Tier 2/3 are ad
 - ai_est_era_or_brand (nullable)
 - ai_classification_confidence (0-1 — drives the clarifying-question trigger below)
 - suggested_disposition: discard | donate | sell | uncertain — *informed by OverrideLog history for the estate, not a one-shot guess — see below*
-- status: unclaimed | claimed | contested | resolved | routed | needs_clarification
+- status: unclaimed | claimed | contested | resolved | routed | needs_clarification | **removed**
+
+*`removed` added 2026-08-15, after the original six — a schema change, not just new logic. Soft delete for a mis-photographed or duplicate item: the document and everything attached to it (claims, messages, resolution) stay, so nothing is orphaned and the item stays readable at its own URL. It is simply never listed. Every status gate in the codebase is an allow-list, so removed items are excluded from claiming, resolving and suggestion recompute by construction.*
 - created_at
+
+**Valuation** *(added 2026-08-17, post-RDD)*
+- id (PK) — deterministic, `valuation__{item_id}`
+- item_id (FK → Item)
+- estate_id (FK → Estate)
+- rough_value (nullable — null means "no estimate", never zero)
+- reason (short text)
+
+*A separate, much smaller Gemini call than the marketplace pipeline, existing because `MarketplaceListing.suggested_price` only covers `sell_marketplace` items — which go to a buyer, not a family member. Measured on the seeded estate at the time: 4 items priced, 11 assigned to a person, **overlap zero**. Framed exactly as `suggested_price` is: a starting point, not an appraisal.*
 
 **OverrideLog** (the persistent-memory / adaptation mechanic — required for Collaborative Partner track eligibility)
 - id (PK)

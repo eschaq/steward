@@ -199,8 +199,20 @@ async function main() {
     assertFails(getDoc(doc(anon(), 'items', ITEM_A))));
   await check('a pending invitee is not yet a member',
     assertFails(getDoc(doc(db(PENDING_A), 'items', ITEM_A))));
-  await check('a member may move status',
+  await check('a member may move status within the claim triad',
     assertSucceeds(updateDoc(doc(db(BEN_A), 'items', ITEM_A), { status: 'claimed' })));
+  // The gap this closed: the status rule checked membership only, so any
+  // beneficiary could write `resolved` straight into Firestore and forge a
+  // settlement that resolve_item would have refused them.
+  await check('a beneficiary cannot settle an item by writing status',
+    assertFails(updateDoc(doc(db(BEN_A), 'items', ITEM_A), { status: 'resolved' })));
+  await check('a beneficiary cannot mark an item on its way',
+    assertFails(updateDoc(doc(db(BEN_A), 'items', ITEM_A), { status: 'routed' })));
+  await check('the executor may settle an item',
+    assertSucceeds(updateDoc(doc(db(EXEC_A), 'items', ITEM_A), { status: 'resolved' })));
+  await check('nobody removes an item from the client, not even the executor',
+    assertFails(updateDoc(doc(db(EXEC_A), 'items', ITEM_A), { status: 'removed' })));
+  await updateDoc(doc(db(EXEC_A), 'items', ITEM_A), { status: 'claimed' });
   await check('status must be a real status',
     assertFails(updateDoc(doc(db(BEN_A), 'items', ITEM_A), { status: 'sold-already' })));
   await check('suggested_disposition is backend-only',

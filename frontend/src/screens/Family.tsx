@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
-import { ApiError, fetchMe, fetchMembers, inviteToEstate } from '../api'
+import { ApiError, deleteEstate, fetchMe, fetchMembers, inviteToEstate } from '../api'
 import { useAuth } from '../auth'
 import { EstateNav } from '../components/EstateNav'
 import { EstateSwitcher } from '../components/EstateSwitcher'
-import { estateId } from '../firebase'
+import { clearEstateId, estateId } from '../firebase'
 import { ROLE_HELP, ROLE_LABEL, type Me, type Member } from '../types'
 
 const ROLES = ['beneficiary', 'executor'] as const
@@ -46,6 +46,39 @@ export function Family() {
     emailed: boolean
     note: string | null
   } | null>(null)
+
+  const [confirming, setConfirming] = useState(false)
+  const [removing, setRemoving] = useState(false)
+  const [removeProblem, setRemoveProblem] = useState<string | null>(null)
+
+  /** Remove this estate, if the backend agrees it is empty.
+   *
+   * The emptiness rule lives on the server and is not second-guessed here: the
+   * frontend cannot see items or messages from this screen, and a client-side
+   * guess would either hide the action when it would have worked or offer it
+   * when it won't. A refusal comes back naming what it found, and that is the
+   * honest thing to show.
+   *
+   * Afterwards the estate id is cleared and the app reloaded — `<Arrival>` then
+   * picks whichever estate is left, or the creation screen if that was the last
+   * one. Keeping a deleted id in localStorage would leave every screen asking
+   * about something that no longer exists.
+   */
+  async function removeEstate() {
+    setRemoveProblem(null)
+    setRemoving(true)
+    try {
+      await deleteEstate(estateId())
+      clearEstateId()
+      window.location.assign('/')
+    } catch (error) {
+      setRemoveProblem(
+        error instanceof ApiError ? error.message : `Couldn't remove it: ${error}`,
+      )
+      setRemoving(false)
+      setConfirming(false)
+    }
+  }
 
   const load = useCallback(async () => {
     setProblem(null)
@@ -291,6 +324,65 @@ export function Family() {
           the same for everyone — <Link to="/">the inventory</Link> is where the
           things are.
         </div>
+      )}
+
+      {/* Last on the page, and quiet. An estate started by mistake should be
+          removable; it should not be the first thing an executor's eye lands on
+          when they came here to invite their sister. */}
+      {loaded && isExecutor && (
+        <section className="teardown">
+          <h2 className="eyebrow">If this one was a mistake</h2>
+          <p className="teardown__intro">
+            An estate with nothing in it can be removed. Steward only allows it
+            while it is genuinely empty — no belongings, nothing said, and nobody
+            else asked in — so there is never anything to lose by it. An estate
+            that has been used stays, whether or not the work is finished.
+          </p>
+
+          {removeProblem && (
+            <p className="notice notice--problem" role="alert">
+              {removeProblem}
+            </p>
+          )}
+
+          {confirming ? (
+            <div className="teardown__confirm">
+              <p className="teardown__ask">
+                Remove <strong>{me?.estate_name ?? estateId()}</strong>? You'll be
+                taken to whichever estate you have left.
+              </p>
+              <div className="teardown__actions">
+                <button
+                  className="button button--primary"
+                  type="button"
+                  disabled={removing}
+                  onClick={() => void removeEstate()}
+                >
+                  {removing ? 'Removing…' : 'Yes, remove it'}
+                </button>
+                <button
+                  className="button button--sage"
+                  type="button"
+                  disabled={removing}
+                  onClick={() => setConfirming(false)}
+                >
+                  Keep it
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              className="button button--sage"
+              type="button"
+              onClick={() => {
+                setRemoveProblem(null)
+                setConfirming(true)
+              }}
+            >
+              Remove this estate
+            </button>
+          )}
+        </section>
       )}
     </main>
   )

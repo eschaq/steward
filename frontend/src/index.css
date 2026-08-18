@@ -1286,6 +1286,42 @@ h3 {
   border-bottom-color: var(--ink-accent);
 }
 
+/* --- removing an estate that was a mistake ---------------------------------
+   Deliberately the quietest block on the page: a hairline above it, no fill, no
+   warning colour. Nothing destructive can happen here — the server only permits
+   it while the estate is genuinely empty — so dressing it as a danger zone would
+   be theatre, and this system does not do alarm. */
+.teardown {
+  margin-top: 44px;
+  padding-top: 26px;
+  border-top: 1px solid var(--hairline);
+}
+
+.teardown__intro {
+  margin: 10px 0 18px;
+  font-size: 15px;
+  color: var(--on-surface-variant);
+  max-width: 62ch;
+}
+
+.teardown__confirm {
+  background: var(--surface-low);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-row);
+  padding: 18px 20px 20px;
+}
+
+.teardown__ask {
+  margin: 0 0 16px;
+  font-size: 16px;
+}
+
+.teardown__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 /* --- the estate switcher ---------------------------------------------------
    Sits on the estate name in the hero, so the name is both where you are and
    how you go elsewhere. No shadow, per DESIGN.md — the panel separates from the

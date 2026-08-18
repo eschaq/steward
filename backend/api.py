@@ -76,6 +76,7 @@ from membership import (
     accept_invite,
     create_auth_user,
     create_estate,
+    delete_empty_estate,
     estates_for_user,
     invite_to_estate,
     list_memberships,
@@ -546,6 +547,14 @@ class EstateSummary(BaseModel):
     created_at: datetime
 
 
+class RemovedEstateResponse(BaseModel):
+    """What was removed. The name comes back so the UI can say it plainly
+    afterwards, when the estate it would have read it from is gone."""
+
+    id: str
+    name: str
+
+
 class MyEstatesResponse(BaseModel):
     count: int
     estates: list[EstateSummary]
@@ -570,6 +579,31 @@ def post_create_estate(body: CreateEstateRequest, uid: CallerUid) -> EstateSumma
         id=estate.id, name=estate.name,
         role=MembershipRole.EXECUTOR.value, created_at=estate.created_at,
     )
+
+
+@app.delete("/estates/{estate_id}", response_model=RemovedEstateResponse)
+def delete_estate(estate_id: str, uid: CallerUid) -> RemovedEstateResponse:
+    """Remove an estate that never had anything in it. Executor-only.
+
+    For the estate made by mistake or to try something out — not for one whose
+    work is finished, which is what `EstateStatus.CLOSED` is for and which keeps
+    its history. `delete_empty_estate` holds the emptiness rule and refuses with
+    a message naming what it found.
+
+    A caller who is not the executor gets 403 from the role check; an estate with
+    anything in it gets 409, which is the same shape every other "you can't do
+    that to this yet" answer in the API has.
+    """
+    try:
+        require_role(uid, estate_id, MembershipRole.EXECUTOR)
+    except MembershipError as exc:
+        raise _forbidden(exc) from exc
+
+    try:
+        estate = delete_empty_estate(estate_id, uid)
+    except MembershipError as exc:
+        raise _conflict(exc) from exc
+    return RemovedEstateResponse(id=estate.id, name=estate.name)
 
 
 @app.get("/me/estates", response_model=MyEstatesResponse)

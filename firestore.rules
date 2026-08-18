@@ -92,6 +92,10 @@ service cloud.firestore {
       // membership can't exist before the estate does.
       allow create: if false;
       allow update: if isExecutor(estateId);
+      // Removing an estate is backend-only too, and stays that way now that it
+      // is a real path: DELETE /estates/{id} only permits it while the estate is
+      // genuinely empty, and that check reads items, messages and memberships —
+      // more than a rule can see about a document being deleted.
       allow delete: if false;
     }
 
@@ -125,12 +129,28 @@ service cloud.firestore {
       // Status is the one field the app's own flows move (claim -> claimed /
       // contested, resolve -> resolved). hasOnly() is what keeps a status update
       // from smuggling an ai_category edit alongside it.
+      //
+      // Split by role, because these two groups of statuses mean different
+      // things. The claim triad is *derived* from the claims a member is
+      // already allowed to write, so a member moving an item between them
+      // forges nothing they could not achieve by claiming. `resolved` and
+      // `routed` are decisions, and decisions are the executor's — resolve_item
+      // and record_disposition_decision both require that role, and a rule
+      // checking only membership let any beneficiary write `resolved`
+      // straight into Firestore and forge a settlement.
+      //
+      // `removed` is in neither list: taking an item off the list is
+      // executor-only *and* has side effects worth keeping in one place, so it
+      // has to go through POST /items/{id}/remove.
       allow update: if isMember(resource.data.estate_id)
                     && changedKeys().hasOnly(['status'])
                     && request.resource.data.status in [
-                         'unclaimed', 'claimed', 'contested',
-                         'resolved', 'routed', 'needs_clarification'
+                         'unclaimed', 'claimed', 'contested', 'needs_clarification'
                        ];
+
+      allow update: if isExecutor(resource.data.estate_id)
+                    && changedKeys().hasOnly(['status'])
+                    && request.resource.data.status in ['resolved', 'routed'];
 
       allow delete: if false;
     }
