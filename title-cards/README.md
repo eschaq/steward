@@ -42,5 +42,13 @@ dark card into a bright working screen reads as stepping inside.
 urgency, and motion is where that leaks back in first — a card that punches in
 reads as a pitch. The only moving element is a hairline rule that draws itself.
 
+**Lower-thirds sit at the top of frame, not the bottom.** The plate is opaque,
+so it always covers something; the only question is what. Bottom-left put it
+squarely on the mediation message — the payoff of the very beat it was
+labelling — which the composite test caught. At the top it clears the app's
+content column at the moments that matter. It still covers *something* (a
+claimant's quote at one timestamp, card description text at another), so place
+these against a part of the take where the upper band is chrome or whitespace.
+
 **Durations are generous on purpose.** An editor can always trim, and cannot
 invent frames that were never rendered.

@@ -22,10 +22,17 @@ export const LowerThird: React.FC<{ text: string }> = ({ text }) => {
   return (
     <AbsoluteFill
       style={{
-        justifyContent: 'flex-end',
+        // **Top of frame, not bottom.** The plate is opaque, so it always covers
+        // something; the only question is what. At the bottom it landed square
+        // on the mediation message — the payoff of the very beat it was
+        // labelling — which a composite test caught. The top band is where the
+        // app keeps its nav and hero, the least informative part of any screen,
+        // and the recordings are scrolled to their content by the time a label
+        // appears.
+        justifyContent: 'flex-start',
         alignItems: 'flex-start',
-        // Clear of the 1080p title-safe area.
-        padding: '0 0 132px 128px',
+        // 80px clears the 5% title-safe margin with room to spare.
+        padding: '80px 0 0 128px',
       }}
     >
       <div
