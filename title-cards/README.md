@@ -42,13 +42,31 @@ dark card into a bright working screen reads as stepping inside.
 urgency, and motion is where that leaks back in first — a card that punches in
 reads as a pitch. The only moving element is a hairline rule that draws itself.
 
-**Lower-thirds sit at the top of frame, not the bottom.** The plate is opaque,
-so it always covers something; the only question is what. Bottom-left put it
-squarely on the mediation message — the payoff of the very beat it was
-labelling — which the composite test caught. At the top it clears the app's
-content column at the moments that matter. It still covers *something* (a
-claimant's quote at one timestamp, card description text at another), so place
-these against a part of the take where the upper band is chrome or whitespace.
+**Lower-thirds are a band across the top, and the footage sits below them.**
+
+A floating plate is opaque, so it covers something wherever it goes. Bottom-left
+put it on the mediation message — the payoff of the beat it was labelling — and
+moving it up only traded that for a claimant's quote. So this was measured
+rather than argued: on that frame, **the tallest horizontal strip carrying no
+content at all is 37px** at 720p, and the label needs 112px. There is nowhere
+clear to put it.
+
+The band makes the room instead. It occupies **y=0–149** and everything below is
+transparent (verified on the rendered alpha channel), so the label covers nothing
+at all — provided the footage is placed under it:
+
+| In DaVinci, on the footage clip | Value |
+| --- | --- |
+| Zoom | **0.861** (930 ÷ 1080) |
+| Position Y | **+75** (down half the band) |
+| Background behind it | `#fff8f4`, the app's own cream |
+
+That is one transform, applied once and copied to every clip the labels sit
+over. `BAND_HEIGHT` in `src/LowerThird.tsx` is the single number both sides
+derive from; change it there and recompute the zoom.
+
+Proof is `out/v-overlay.jpg` — the same beat-1 frame with the band applied,
+showing both claim quotes and every line of Steward's mediation.
 
 **Durations are generous on purpose.** An editor can always trim, and cannot
 invent frames that were never rendered.

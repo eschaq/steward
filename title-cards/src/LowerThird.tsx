@@ -16,43 +16,52 @@ import { color, font, useFade } from './brand'
  * the brand has none anywhere, and depth here is the plate's own tone against
  * whatever is behind it.
  */
+/** The band's height, and the single number an editor needs: the footage is
+ * scaled to fit the 1080 - BAND_HEIGHT that remains, so nothing it shows ever
+ * passes underneath the label. */
+export const BAND_HEIGHT = 150
+
 export const LowerThird: React.FC<{ text: string }> = ({ text }) => {
   const opacity = useFade({ inFor: 24, outFor: 24 })
 
   return (
     <AbsoluteFill
       style={{
-        // **Top of frame, not bottom.** The plate is opaque, so it always covers
-        // something; the only question is what. At the bottom it landed square
-        // on the mediation message — the payoff of the very beat it was
-        // labelling — which a composite test caught. The top band is where the
-        // app keeps its nav and hero, the least informative part of any screen,
-        // and the recordings are scrolled to their content by the time a label
-        // appears.
+        // **A band across the top, not a plate floating over the picture.**
+        //
+        // A floating plate is opaque, so it always covers something. Measured on
+        // the beat-1 frame it was meant to label: the tallest horizontal strip
+        // of that screen carrying no content at all is 37px at 720p, and the
+        // label needs 112px. There is nowhere to put it that is clear of
+        // content, so the answer is to make room rather than to keep hunting for
+        // it — the footage sits *below* this band, and the label covers nothing.
+        //
+        // See README for the one transform an editor applies to the footage.
         justifyContent: 'flex-start',
         alignItems: 'flex-start',
-        // 80px clears the 5% title-safe margin with room to spare.
-        padding: '80px 0 0 128px',
+        padding: 0,
       }}
     >
       <div
         style={{
           opacity,
+          // The band itself: full width, fixed height, so the footage below it
+          // always begins at exactly the same line.
+          width: '100%',
+          height: BAND_HEIGHT,
           display: 'flex',
           alignItems: 'center',
           gap: 26,
-          background: 'rgba(23,17,12,0.92)',
-          border: `1px solid ${color.inkHairline}`,
-          // Row radius from the design system, not a pill: this labels
-          // something, and pills are reserved for actions.
-          borderRadius: 14,
-          padding: '26px 40px 28px',
+          padding: '0 128px',
+          background: color.inkDeep,
+          borderBottom: `1px solid ${color.inkHairline}`,
+          boxSizing: 'border-box',
         }}
       >
         <div
           style={{
             width: 4,
-            alignSelf: 'stretch',
+            height: 54,
             background: color.inkAccent,
             borderRadius: 2,
           }}
