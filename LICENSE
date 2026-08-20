@@ -1,16 +1,22 @@
-MIT License
+All Rights Reserved
 
 Copyright (c) 2026 Eban Schachter
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+All rights reserved.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+This software and its associated documentation files (the "Software") are the
+proprietary and confidential property of the copyright holder. No part of the
+Software may be reproduced, distributed, modified, published, sublicensed,
+sold, or used to create derivative works, in whole or in part, by any means,
+without the prior written permission of the copyright holder.
+
+Viewing this repository does not grant any license or right to the Software.
+Permission to view source code — including where this repository is publicly
+accessible — is not permission to copy or reuse it.
+
+Third-party components included in or referenced by the Software remain subject
+to their own licenses, which are unaffected by this notice. See
+frontend/mockups/CREDITS.md for attribution required by third-party assets.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,

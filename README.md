@@ -196,4 +196,7 @@ cases against the emulator, and real-browser runs against the deployed services.
 
 ## License
 
-[MIT](LICENSE)
+**All rights reserved** — see [LICENSE](LICENSE). This repository is public so
+the work can be read and judged; that is not permission to copy, reuse, or
+build on it. Third-party assets keep their own terms, including the CC BY 2.0
+photograph documented in [frontend/mockups/CREDITS.md](frontend/mockups/CREDITS.md).
